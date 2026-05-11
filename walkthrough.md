@@ -177,6 +177,7 @@ import (
     "net/http"
     "os"
     "strings"
+    "errors"
 )
 ```
 **Lines 3–8:** Four imports:
@@ -184,6 +185,7 @@ import (
 - `net/http` — needed for `http.ResponseWriter`, `http.Request`, `http.Error`, and status code constants.
 - `os` — for `os.ReadFile` to read the banner `.txt` files from disk.
 - `strings` — for `strings.ReplaceAll` and `strings.Split` to process file content and user input.
+- `errors` — for `errors.New()` to create descriptive error values when a banner file is not found.
 
 ---
 
@@ -247,11 +249,32 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 ---
 
 ```go
-    tmpl.Execute(w, "")
+    w.WriteHeader(http.StatusOK)
+
+    err = tmpl.Execute(w, ...)
+    if err != nil {
+        http.Error(w, "500 Internal Server Error:\nError rendering template", http.StatusInternalServerError)
+        return
+    }
 ```
-**Line 21:** Render the template and send it to the browser.
-- `tmpl.Execute(w, "")` — takes the parsed template, replaces any `{{ . }}` placeholders with the data passed as the second argument, and writes the result to `w` (the response).
-- `""` — empty string. On the home page's first load, there's no ASCII art to display yet. We pass an empty string so `{{ . }}` renders as nothing (not `<nil>`).
+**Line 21:** Send the response and render the template
+
+* `w.WriteHeader(http.StatusOK)` sends an HTTP status code `200 OK` to the browser, indicating that the request was successful.
+
+* `tmpl.Execute(w, "")` renders the HTML template and sends an empty string to `{{ . }}`, so no content is displayed in the template initially.
+  * `w` is the response writer where the HTML output is sent.
+  * `result` contains the generated ASCII art text.
+
+* Inside the HTML template, `{{ . }}` represents the data passed to `Execute()`.
+  This means the ASCII art stored in `result` will appear wherever `{{ . }}` is placed in the template.
+
+* If template rendering fails, the `if err != nil` block handles the error by:
+
+  * Sending a `500 Internal Server Error` response to the client.
+  * Displaying an error message in the browser.
+  * Stopping further execution using `return`.
+
+* As a result, the browser receives a fully rendered HTML page containing the generated ASCII art inside the `<pre>` tag.
 
 ---
 
@@ -297,55 +320,70 @@ func asciiArtHandler(w http.ResponseWriter, r *http.Request) {
 
 ```go
     banner := r.FormValue("banner")
-    if banner == "" {
-        http.Error(w, "Banner cannot be empty", http.StatusBadRequest)
+    if banner != "standard" && banner != "shadow" && banner != "thinkertoy" {
+        http.Error(w, "400 Bad Request:\nInvalid banner", http.StatusBadRequest)
         return
     }
 ```
 **Lines 36–40:** Extract and validate the banner selection.
 - `r.FormValue("banner")` — gets the selected radio button value. The `"banner"` matches `name="banner"` on the radio inputs in `home.html`.
-- If no radio button was selected, `banner` will be an empty string → 400 error.
+- Validates that the banner is one of the three known values. Prevents path traversal attacks where someone could send banner=../../etc/passwd to read arbitrary files.
 
 ---
 
 ```go
-    result := AsciiArt(text, banner)
-    if result == "" {
-        http.Error(w, "Error Generating Ascii Art", http.StatusInternalServerError)
+    result, err := AsciiArt(text, banner)
+    if err != nil {
+        http.Error(w, "404 Not Found:\nError loading banner file", http.StatusNotFound)
         return
     }
 ```
 **Lines 42–46:** Generate the ASCII art and validate the output.
-- `AsciiArt(text, banner)` — calls the function defined below, passing the user's text and their banner choice.
-- `result == ""` — if `AsciiArt` returned an empty string, something went wrong internally (e.g., the banner file couldn't be read).
-- `http.StatusInternalServerError` — Go's constant for `500`. The spec says "500 Internal Server Error, for unhandled errors."
+- `AsciiArt(text, banner)` — AsciiArt now returns two values. If err is not nil, the banner file was missing — return 404.
 
 ---
 
 ```go
-    tmpl, err := template.ParseFiles("templates/home.html")
-    if err != nil {
-        http.Error(w, "Error loading template", http.StatusNotFound)
-        return
-    }
-    tmpl.Execute(w, result)
+	w.WriteHeader(http.StatusOK)
+
+	err = tmpl.Execute(w, result)
+ 	if err != nil {
+    	http.Error(w, "500 Internal Server Error:\nError rendering template", http.StatusInternalServerError)
+    	return
+	}
 ```
-**Lines 48–53:** Load the template and render it with the ASCII art result.
-- Same pattern as `homeHandler`, but this time we pass `result` (the generated ASCII art string) instead of `""`.
-- When the template renders, `{{ . }}` gets replaced with the ASCII art string.
-- The browser receives a complete HTML page with the art already inside the `<pre>` tag.
+**Lines 48–53:** Send the response and render the template
+
+* `w.WriteHeader(http.StatusOK)` sends an HTTP status code `200 OK` to the browser, indicating that the request was successful.
+
+* `tmpl.Execute(w, result)` renders the HTML template and injects the `result` data into it.
+
+  * `w` is the response writer where the HTML output is sent.
+  * `result` contains the generated ASCII art text.
+
+* Inside the HTML template, `{{ . }}` represents the data passed to `Execute()`.
+  This means the ASCII art stored in `result` will appear wherever `{{ . }}` is placed in the template.
+
+* If template rendering fails, the `if err != nil` block handles the error by:
+
+  * Sending a `500 Internal Server Error` response to the client.
+  * Displaying an error message in the browser.
+  * Stopping further execution using `return`.
+
+* As a result, the browser receives a fully rendered HTML page containing the generated ASCII art inside the `<pre>` tag.
+
 
 ---
 
 ### AsciiArt Function
 
 ```go
-func AsciiArt(input string, banners string) string {
+func AsciiArt(input string, banners string) (string, error)
 ```
 **Line 57:** The core function that generates ASCII art.
 - `input string` — the text the user typed (e.g., `"Hello"`)
 - `banners string` — the banner name (e.g., `"standard"`, `"shadow"`, or `"thinkertoy"`)
-- Returns `string` — the generated ASCII art, or `""` on failure
+- Returns `(string, error)` — the ASCII art and nil on success, or empty string and an error on failure
 
 **This is NOT a handler function** — it doesn't have `w` and `r` parameters. It's a pure helper function that takes input and returns output.
 
@@ -364,7 +402,7 @@ func AsciiArt(input string, banners string) string {
 ```go
     inputFile, err := os.ReadFile(filePath)
     if err != nil {
-        return ""
+        return "", errors.New("banner file not found")
     }
 ```
 **Lines 60–63:** Read the banner file from disk.
@@ -420,6 +458,24 @@ func AsciiArt(input string, banners string) string {
 - `word` — the current word/line being processed.
 
 ---
+
+```go
+if input == "" {
+    return "", nil
+}
+```
+
+### Explanation
+
+* This condition checks whether the user entered an empty string as input.
+
+* If `input` is empty, the function immediately stops execution and returns:
+
+  * `""` → an empty result string
+  * `nil` → meaning no error occurred
+
+* This prevents the program from trying to generate ASCII art when no text was provided.
+
 
 ```go
         if word == "" {
@@ -751,13 +807,21 @@ import (
 
 | Test | What it checks |
 |------|-------|
-| `TestAsciiArtValidBanner` | `"Hello"` + `"standard"` produces non-empty output |
-| `TestAsciiArtShadowBanner` | `"Hello"` + `"shadow"` produces non-empty output |
-| `TestAsciiArtThinkertoyBanner` | `"Hello"` + `"thinkertoy"` produces non-empty output |
-| `TestAsciiArtInvalidBanner` | `"Hello"` + `"nonexistent"` returns `""` (graceful failure) |
-| `TestAsciiArtEmptyInput` | `""` + `"standard"` returns `""` (nothing to render) |
-| `TestAsciiArtNewline` | `"Hi\nHi"` produces more than 8 lines (multi-line works) |
-| `TestAsciiArtOutputHasEightLinesPerWord` | `"Hi"` produces exactly 8 lines (correct character height) |
+| `TestAsciiArtValidBanner` | `"Hello" + "standard"` produces non-empty output, no error |
+| `TestAsciiArtShadowBanner` | `"Hello" + "shadow"` produces non-empty output, no error |
+| `TestAsciiArtThinkertoyBanner` | `"Hello" + "thinkertoy"` produces non-empty output, no error |
+| `TestAsciiArtInvalidBanner` | `"Hello" + "nonexistent"` returns error |
+| `TestAsciiArtEmptyInput` | `"" + "standard"` returns empty string, no error |
+| `TestAsciiArtNewline` | `"Hi\\nHi"` produces more than 8 lines |
+| `TestAsciiArtOutputHasEightLinesPerWord` | `"Hi"` produces exactly 8 lines |
+| `TestAsciiArtSpecialCharacters` | `"123??" + "standard"` produces non-empty output |
+| `TestHomeHandler` | GET `"/"` returns 200 |
+| `TestHomeHandlerInvalidPath` | GET `/invalid` returns 404 |
+| `TestAsciiArtHandlerReturns200` | POST `/ascii-art` with valid data returns 200 |
+| `TestAsciiArtHandlerEmptyText` | POST with empty text returns 400 |
+| `TestAsciiArtHandlerInvalidBanner` | POST with invalid banner returns 400 |
+| `TestAsciiArtHandlerWrongMethod` | GET `/ascii-art` returns 405 |
+| `TestAsciiArtHandlerMultiLine` | POST with `Hello\nWorld` returns 200 |
 
 Run all tests with:
 ```bash

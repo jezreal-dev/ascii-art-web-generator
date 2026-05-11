@@ -7,13 +7,13 @@ import (
 )
 
 func main() {
-    http.HandleFunc("/", homeHandler)
-    http.HandleFunc("/ascii-art", asciiArtHandler)
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/ascii-art", asciiArtHandler)
 
-    fmt.Println("Server running at http://localhost:8080")
+	fmt.Println("Server running at http://localhost:8080")
 
-    err := http.ListenAndServe(":8080", nil)
-    if err != nil {
-        log.Fatal("Error starting server:", err)
-    }
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Fatal("Error starting server:", err)
+	}
 }

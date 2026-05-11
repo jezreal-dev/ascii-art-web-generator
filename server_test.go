@@ -2,52 +2,72 @@ package main
 
 import (
 	"strings"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
 // TestAsciiArtValidBanner tests that AsciiArt returns non-empty output for valid inputs
 func TestAsciiArtValidBanner(t *testing.T) {
-	result := AsciiArt("Hello", "standard")
+	result, err := AsciiArt("Hello", "standard")
+	if err != nil {
+    	t.Errorf("Expected no error, got: %v", err)
+	}
 	if result == "" {
-		t.Error("Expected non-empty result for valid input and banner, got empty string")
+    	t.Error("Expected non-empty result, got empty string")
 	}
 }
 
 // TestAsciiArtShadowBanner tests the shadow banner
 func TestAsciiArtShadowBanner(t *testing.T) {
-	result := AsciiArt("Hello", "shadow")
+	result, err := AsciiArt("Hello", "shadow")
+	if err != nil {
+    	t.Errorf("Expected no error, got: %v", err)
+	}
 	if result == "" {
-		t.Error("Expected non-empty result for shadow banner, got empty string")
+    	t.Error("Expected non-empty result, got empty string")
 	}
 }
 
 // TestAsciiArtThinkertoyBanner tests the thinkertoy banner
 func TestAsciiArtThinkertoyBanner(t *testing.T) {
-	result := AsciiArt("Hello", "thinkertoy")
+	result, err := AsciiArt("Hello", "thinkertoy")
+	if err != nil {
+    	t.Errorf("Expected no error, got: %v", err)
+	}
 	if result == "" {
-		t.Error("Expected non-empty result for thinkertoy banner, got empty string")
+    	t.Error("Expected non-empty result, got empty string")
 	}
 }
 
 // TestAsciiArtInvalidBanner tests that AsciiArt returns empty string for a non-existent banner
 func TestAsciiArtInvalidBanner(t *testing.T) {
-	result := AsciiArt("Hello", "nonexistent")
+	result, err := AsciiArt("Hello", "nonexistent")
+	if err == nil {
+    	t.Error("Expected error for invalid banner, got nil")
+	}
 	if result != "" {
-		t.Error("Expected empty result for invalid banner, got non-empty string")
+    	t.Error("Expected empty result for invalid banner")
 	}
 }
 
 // TestAsciiArtEmptyInput tests that empty input returns empty output
 func TestAsciiArtEmptyInput(t *testing.T) {
-	result := AsciiArt("", "standard")
+	result, err := AsciiArt("", "standard")
+	if err != nil {
+    	t.Error("Expected no error for empty input")
+	}
 	if result != "" {
-		t.Errorf("Expected empty result for empty input, got: %q", result)
+    	t.Error("Expected empty result for empty input")
 	}
 }
 
 // TestAsciiArtNewline tests that \n in input produces multi-line output
 func TestAsciiArtNewline(t *testing.T) {
-	result := AsciiArt("Hi\\nHi", "standard")
+	result, err := AsciiArt("Hi\\nHi", "standard")
+	if err != nil {
+    	t.Errorf("Expected no error for valid input, got: %v", err)
+	}
 	if result == "" {
 		t.Error("Expected non-empty result for multi-line input")
 	}
@@ -60,9 +80,98 @@ func TestAsciiArtNewline(t *testing.T) {
 
 // TestAsciiArtOutputHasEightLinesPerWord tests that each word produces exactly 8 lines of art
 func TestAsciiArtOutputHasEightLinesPerWord(t *testing.T) {
-	result := AsciiArt("Hi", "standard")
+	result, err := AsciiArt("Hi", "standard")
 	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
 	if len(lines) != 8 {
 		t.Errorf("Expected 8 lines of output for single word, got %d", len(lines))
+	}
+	if err != nil {
+    	t.Errorf("Expected no error for valid input, got: %v", err)
+	}
+}
+
+func TestAsciiArtSpecialCharacters(t *testing.T) {
+	result, err := AsciiArt("123??", "standard")
+	if err != nil {
+    	t.Errorf("Expected no error, got: %v", err)
+	}
+	if result == "" {
+    	t.Error("Expected non-empty result, got empty string")
+	}
+}
+
+// 
+func TestHomeHandler(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	homeHandler(rr, req)
+	if rr.Code != http.StatusOK {
+    	t.Errorf("Expected 200, got %d", rr.Code)
+	}
+}
+
+func TestHomeHandlerInvalidPath(t *testing.T) {
+	req := httptest.NewRequest("GET", "/invalid", nil)
+	rr := httptest.NewRecorder()
+	homeHandler(rr, req)
+	if rr.Code != http.StatusNotFound {
+    	t.Errorf("Expected 404, got %d", rr.Code)
+	}
+}
+
+func TestAsciiArtHandlerReturns200(t *testing.T) {
+	body := strings.NewReader("text=Hello&banner=standard")
+	req := httptest.NewRequest("POST", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusOK {
+    	t.Errorf("Expected 200, got %d", rr.Code)
+	}
+}
+
+
+func TestAsciiArtHandlerEmptyText(t *testing.T) {
+	body := strings.NewReader("text=&banner=standard")
+	req := httptest.NewRequest("POST", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+    	t.Errorf("Expected 400, got %d", rr.Code)
+	}
+}
+
+
+func TestAsciiArtHandlerInvalidBanner(t *testing.T) {
+	body := strings.NewReader("text=Hello&banner=fakebanner")
+	req := httptest.NewRequest("POST", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+    	t.Errorf("Expected 400, got %d", rr.Code)
+	}
+}
+
+func TestAsciiArtHandlerWrongMethod(t *testing.T) {
+	body := strings.NewReader("text=Hello&banner=fakebanner")
+	req := httptest.NewRequest("GET", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+    	t.Errorf("Expected 405, got %d", rr.Code)
+	}
+}
+
+func TestAsciiArtHandlerMultiLine(t *testing.T) {
+	body := strings.NewReader("text=Hello%5CnWorld&banner=standard")
+	req := httptest.NewRequest("POST", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusOK {
+    	t.Errorf("Expected 200, got %d", rr.Code)
 	}
 }
