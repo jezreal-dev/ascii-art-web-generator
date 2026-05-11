@@ -6,7 +6,7 @@ ASCII Art Web is a web-based GUI version of the ascii-art project. It runs an HT
 
 ## Authors
 
-- jmomoh
+- Jezreal (Username - jmomoh) & Mansur (Username - madeyemi)
 
 ## Usage
 
