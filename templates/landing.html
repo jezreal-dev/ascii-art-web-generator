@@ -187,16 +187,25 @@
         }
 
         .bio-links a {
-            color: var(--accent-color);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 18px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: var(--text-primary);
             text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: color 0.2s ease;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s ease;
         }
 
         .bio-links a:hover {
-            color: #818cf8;
-            text-decoration: underline;
+            background: rgba(99, 102, 241, 0.25);
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--accent-glow);
         }
 
         /* Footer */
@@ -210,14 +219,26 @@
         }
 
         footer a {
-            color: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
             text-decoration: none;
-            margin: 0 8px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            margin: 4px 6px;
         }
 
         footer a:hover {
-            color: var(--text-secondary);
-            text-decoration: underline;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
         }
 
         @keyframes fadeIn {
