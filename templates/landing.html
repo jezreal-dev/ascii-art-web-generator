@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Art Generator - Web GUI</title>
+    <!-- Import Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at top, #1e293b, #0f172a);
+            --card-bg: rgba(30, 41, 59, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #6366f1; /* Indigo */
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --btn-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+            --btn-hover: linear-gradient(135deg, #818cf8, #6366f1);
+            --btn-glow: rgba(99, 102, 241, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Container */
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            padding: 40px 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 60px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #a5b4fc, #818cf8, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 16px 36px;
+            background: var(--btn-gradient);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 8px;
+            font-size: 16px;
+            box-shadow: 0 4px 14px var(--btn-glow);
+            transition: all 0.2s ease;
+            margin-top: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .cta-btn:hover {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--btn-glow);
+        }
+
+        /* Features Section */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin: 40px 0;
+            animation: slideUp 0.8s ease-out;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            color: #6366f1;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        .feature-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Bio/Credits Section */
+        .bio-section {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 32px;
+            margin-top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .bio-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .bio-content h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .bio-content p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .bio-links {
+            margin-top: 12px;
+            display: flex;
+            gap: 16px;
+        }
+
+        .bio-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .bio-links a:hover {
+            color: #818cf8;
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(148, 163, 184, 0.5);
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            width: 100%;
+        }
+
+        footer a {
+            color: inherit;
+            text-decoration: none;
+            margin: 0 8px;
+        }
+
+        footer a:hover {
+            color: var(--text-secondary);
+            text-decoration: underline;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            .bio-section {
+                flex-direction: column;
+                text-align: center;
+            }
+            .bio-links {
+                justify-content: center;
+            }
+            .hero h1 {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>ASCII Art Web Generator</h1>
+            <p>A production-grade, compliance-verified Go web server that transforms plain text into beautiful retro terminal typography.</p>
+            <a href="/generator" class="cta-btn">Launch Generator</a>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="features-grid">
+            <div class="feature-card">
+                <span class="feature-icon">⚡</span>
+                <h3>High Performance Go</h3>
+                <p>Built using the native Go HTTP package. Sub-millisecond ASCII character calculations with O(N) linear time lookup efficiency.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🛡️</span>
+                <h3>Secure & Validated</h3>
+                <p>Defends against range overflows, non-printable unicode strings (emojis), and directory traversal banner injection attacks.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎨</span>
+                <h3>Sleek Aesthetics</h3>
+                <p>Glassmorphic dark UI built with pure CSS. Responsive, animated, and featuring state preservation and a copy-to-clipboard widget.</p>
+            </div>
+        </section>
+
+        <!-- Bio / Profile -->
+        <section class="bio-section">
+            <div class="bio-avatar">JM</div>
+            <div class="bio-content">
+                <h3>Developed by Jezreal Momoh</h3>
+                <p>Full-Stack Software Engineer. Originally created during the Learn2Earn Fellowship program, this project showcases clean Go architecture, error templates, and web development fundamentals.</p>
+                <div class="bio-links">
+                    <a href="https://github.com/jezreal-dev" target="_blank">GitHub Profile</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Jezreal Momoh. Released under the MIT License.</p>
+        <p>
+            <a href="/privacy">Privacy Policy</a> | 
+            <a href="/terms">Terms of Service</a>
+        </p>
+    </footer>
+</body>
+</html>

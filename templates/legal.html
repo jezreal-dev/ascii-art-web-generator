@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - ASCII Art Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at top, #1e293b, #0f172a);
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #6366f1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .legal-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 40px;
+            width: 100%;
+            max-width: 680px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            background: linear-gradient(to right, #a5b4fc, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 12px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 10px 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="legal-card">
+        <h1>{{ .Title }}</h1>
+        
+        {{ if eq .Type "privacy" }}
+            <h2>Data Collection</h2>
+            <p>We do not collect, store, or sell any personal data. The text you enter into the generator is processed solely in-memory to generate your ASCII art and is not saved to any database or log file.</p>
+            
+            <h2>Cookies</h2>
+            <p>This website does not use tracking cookies, analytics scripts, or advertisement trackers. A clean user experience is our priority.</p>
+            
+            <h2>Contact</h2>
+            <p>If you have any questions, you can contact the developer via GitHub at github.com/jezreal-dev.</p>
+        {{ else }}
+            <h2>Acceptable Use</h2>
+            <p>You agree to use this generator only for lawful purposes. You must not enter inputs containing harmful, offensive, or malicious text intended to disrupt services or create hostile contents.</p>
+            
+            <h2>Disclaimer</h2>
+            <p>This software is provided "as is", without warranty of any kind, express or implied. In no event shall the authors be liable for any claim, damages, or other liability arising from the use of this website.</p>
+            
+            <h2>License</h2>
+            <p>This web generator is open-source software licensed under the terms of the MIT License.</p>
+        {{ end }}
+        
+        <a href="/" class="back-btn">← Back Home</a>
+    </div>
+</body>
+</html>

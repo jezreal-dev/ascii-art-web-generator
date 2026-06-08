@@ -4,15 +4,26 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
 	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/generator", generatorHandler)
 	http.HandleFunc("/ascii-art", asciiArtHandler)
+	http.HandleFunc("/privacy", privacyHandler)
+	http.HandleFunc("/terms", termsHandler)
 
-	fmt.Println("Server running at http://localhost:8080")
+	// Read port from environment variable, default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	err := http.ListenAndServe(":8080", nil)
+	fmt.Printf("Server running at http://localhost:%s\n", port)
+
+	// Bind dynamically to the port
+	err := http.ListenAndServe(":"+ port, nil)
 	if err != nil {
 		log.Fatal("Error starting server:", err)
 	}

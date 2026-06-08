@@ -1,0 +1,28 @@
+name: Go Continuous Integration
+
+# Trigger this workflow on every push or pull request to the main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build and Run Tests
+    runs-on: ubuntu-latest # Run on a fresh, modern Linux VM
+
+    steps:
+      # Step 1: Download the repository code onto the runner VM
+      - name: Check out Repository Code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Go on the runner VM
+      - name: Set up Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' # Installs Go version 1.22
+
+      # Step 3: Compile and run the test suite
+      - name: Run Test Suite
+        run: go test -v
