@@ -175,3 +175,44 @@ func TestAsciiArtHandlerMultiLine(t *testing.T) {
     	t.Errorf("Expected 200, got %d", rr.Code)
 	}
 }
+
+func TestAsciiArtInvalidCharacter(t *testing.T) {
+	_, err := AsciiArt("Hello 😊", "standard")
+	if err == nil {
+		t.Error("Expected error for non-ASCII emoji character, got nil")
+	}
+	if err != nil && err.Error() != "Invalid character in input" {
+		t.Errorf("Expected 'Invalid character in input' error, got: %v", err)
+	}
+}
+
+func TestAsciiArtActualNewline(t *testing.T) {
+	result, err := AsciiArt("Hello\nWorld", "standard")
+	if err != nil {
+		t.Errorf("Expected no error for actual newline, got: %v", err)
+	}
+	if result == "" {
+		t.Error("Expected non-empty result for actual newline")
+	}
+}
+
+func TestAsciiArtOnlyNewlines(t *testing.T) {
+	result, err := AsciiArt("\n\n", "standard")
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if result != "\n\n" {
+		t.Errorf("Expected exactly two newlines, got: %q", result)
+	}
+}
+
+func TestAsciiArtHandlerInvalidCharacter(t *testing.T) {
+	body := strings.NewReader("text=Hello+😊&banner=standard")
+	req := httptest.NewRequest("POST", "/ascii-art", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	asciiArtHandler(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request, got %d", rr.Code)
+	}
+}

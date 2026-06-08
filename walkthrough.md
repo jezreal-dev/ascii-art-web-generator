@@ -1,872 +1,473 @@
-# ASCII Art Web — Complete Code Walkthrough
+# ASCII Art Web — Complete Code Walkthrough & Collaboration Guide
 
-This document explains every single line of code in the ascii-art-web project, the logic behind each decision, and how all the files connect together.
-
----
-
-## Table of Contents
-
-1. [Project Structure Overview](#project-structure-overview)
-2. [How the Whole System Works](#how-the-whole-system-works)
-3. [main.go — The Entry Point](#maingo--the-entry-point)
-4. [server.go — Handlers and Logic](#servergo--handlers-and-logic)
-   - [homeHandler](#homehandler)
-   - [asciiArtHandler](#asciiarthandler)
-   - [AsciiArt Function](#asciiart-function)
-5. [templates/home.html — The Frontend](#templateshomehtml--the-frontend)
-   - [HTML Structure](#html-structure)
-   - [CSS Styling](#css-styling)
-   - [Go Template Syntax](#go-template-syntax)
-6. [server_test.go — Tests](#server_testgo--tests)
-7. [Banner Files](#banner-files)
-8. [HTTP Status Codes Used](#http-status-codes-used)
+This document provides a line-by-line explanation of every function, logic block, and template in the upgraded `ascii-art-web` project. It is designed to help collaborators and evaluators understand how the system operates, the edge cases handled, and the design decisions made.
 
 ---
 
-## Project Structure Overview
+## 1. Project Structure Overview
 
-```
-ascii-art-web/
-├── main.go              # Entry point — registers routes, starts server
-├── server.go            # HTTP handlers + ASCII art generation logic
-├── server_test.go       # Unit tests for the AsciiArt function
-├── go.mod               # Go module definition (created by `go mod init`)
-├── README.md            # Project documentation
-├── walkthrough.md       # This file
-├── templates/
-│   └── home.html        # HTML template — the page the user sees
-└── banners/
-    ├── standard.txt     # Standard ASCII art font
-    ├── shadow.txt       # Shadow ASCII art font
-    └── thinkertoy.txt   # Thinkertoy ASCII art font
+```mermaid
+graph TD
+    %% Project Structure Graph
+    Root["ascii-art-web (Root Directory)"]
+    
+    %% Main Files
+    Main["main.go <br> (Entry Point)"]
+    Server["server.go <br> (Handlers & Logic)"]
+    Test["server_test.go <br> (Unit & Integration Tests)"]
+    Mod["go.mod <br> (Module Definition)"]
+    Read["README.md <br> (Documentation)"]
+    Walk["walkthrough.md <br> (This Guide)"]
+    
+    %% Directories
+    TemplatesDir["templates/ <br> (HTML Presentation Layer)"]
+    BannersDir["banners/ <br> (ASCII Font Character Database)"]
+    
+    %% Inside Directories
+    HomeTmpl["home.html <br> (Main Web Page)"]
+    ErrorTmpl["error.html <br> (Styled Error Page)"]
+    
+    StandardB["standard.txt <br> (Standard Font)"]
+    ShadowB["shadow.txt <br> (Shadow Font)"]
+    ThinkertoyB["thinkertoy.txt <br> (Thinkertoy Font)"]
+
+    %% Connections
+    Root --> Main
+    Root --> Server
+    Root --> Test
+    Root --> Mod
+    Root --> Read
+    Root --> Walk
+    Root --> TemplatesDir
+    Root --> BannersDir
+    
+    TemplatesDir --> HomeTmpl
+    TemplatesDir --> ErrorTmpl
+    
+    BannersDir --> StandardB
+    BannersDir --> ShadowB
+    BannersDir --> ThinkertoyB
+
+    %% Styles
+    classDef dir fill:#1e293b,stroke:#4f46e5,stroke-width:2px,color:#f8fafc;
+    classDef file fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#94a3b8;
+    classDef root fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#f8fafc;
+    
+    class Root root;
+    class TemplatesDir,BannersDir dir;
+    class Main,Server,Test,Mod,Read,Walk,HomeTmpl,ErrorTmpl,StandardB,ShadowB,ThinkertoyB file;
 ```
 
-**Why this structure?**
-- `main.go` and `server.go` are separate to keep concerns separated — `main.go` handles startup, `server.go` handles logic.
-- `templates/` holds HTML files — the spec requires this folder name.
-- `banners/` holds the font data files — kept separate from templates because they serve a different purpose (data vs. presentation).
+* **`main.go`**: Starts up the application, configures the routes, and binds the TCP port.
+* **`server.go`**: Contains the state structs, handler functions for requests, custom template error loaders, and the core rendering generator.
+* **`templates/`**: Hosts our frontend layouts. `home.html` serves as the form and viewer, and `error.html` is executed on HTTP errors.
+* **`banners/`**: Houses the text-based ASCII font characters database.
 
 ---
 
-## How the Whole System Works
+## 2. How the Whole System Works
 
-Here's the complete flow of a user request:
+This sequence diagram displays the step-by-step lifecycles of `GET` and `POST` requests, highlighting validation gates and database interactions.
 
-```
-User opens browser → types localhost:8080
-        ↓
-Browser sends GET request to "/"
-        ↓
-Go server receives it → homeHandler runs
-        ↓
-homeHandler loads templates/home.html and sends it back
-        ↓
-User sees the form → types text, picks a banner, clicks "Generate"
-        ↓
-Browser sends POST request to "/ascii-art" with form data
-        ↓
-Go server receives it → asciiArtHandler runs
-        ↓
-asciiArtHandler extracts text and banner from the form
-        ↓
-Calls AsciiArt(text, banner) to generate the art
-        ↓
-Loads templates/home.html again, passes the art result to it
-        ↓
-Template renders with the ASCII art inside the <pre> tag
-        ↓
-User sees the ASCII art on the page
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Web Browser
+    participant Router as Go Router (DefaultServeMux)
+    participant Handler as Handlers (homeHandler / asciiArtHandler)
+    participant FS as File System (banners/*.txt / templates/*.html)
+    participant Template as Go html/template Engine
+
+    rect rgb(30, 41, 59)
+        note right of Client: User opens page (GET /)
+        Client->>Router: GET /
+        Router->>Handler: homeHandler(w, r)
+        Handler->>FS: Load templates/home.html
+        FS-->>Handler: home.html bytes
+        Handler->>Template: Parse & Execute (PageData{Banner: "standard"})
+        Template-->>Handler: Rendered HTML page
+        Handler-->>Client: 200 OK HTML Page
+    end
+
+    rect rgb(15, 23, 42)
+        note right of Client: User submits text (POST /ascii-art)
+        Client->>Router: POST /ascii-art [text, banner]
+        Router->>Handler: asciiArtHandler(w, r)
+        Handler->>Handler: Validate inputs (text != "", valid banner name)
+        alt invalid input
+            Handler->>FS: Load templates/error.html
+            FS-->>Handler: error.html bytes
+            Handler->>Template: Parse & Execute (Status: 400, Message)
+            Template-->>Handler: Rendered HTML Error Page
+            Handler-->>Client: 400 Bad Request HTML Page
+        else valid parameters
+            Handler->>FS: Read banner file (banners/<banner>.txt)
+            alt banner file not found or corrupted
+                FS-->>Handler: error (missing or short file)
+                Handler->>Template: Parse & Execute (Status: 404, Message)
+                Template-->>Handler: Rendered HTML Error Page
+                Handler-->>Client: 404 Not Found HTML Page
+            else banner loaded successfully
+                FS-->>Handler: banner bytes
+                Handler->>Handler: AsciiArt(text, banner)
+                loop For each character
+                    Handler->>Handler: Validate ASCII code [32, 126]
+                end
+                alt contains invalid characters (e.g. emoji)
+                    Handler->>Template: Parse & Execute (Status: 400, Message)
+                    Template-->>Handler: Rendered HTML Error Page
+                    Handler-->>Client: 400 Bad Request HTML Page
+                else all valid
+                    Handler->>FS: Load templates/home.html
+                    FS-->>Handler: home.html bytes
+                    Handler->>Template: Parse & Execute (PageData{text, banner, art})
+                    Template-->>Handler: Rendered HTML Page
+                    Handler-->>Client: 200 OK HTML Page (with ASCII Art)
+                end
+            end
+        end
+    end
 ```
 
 ---
 
-## main.go — The Entry Point
+## 3. Comparison: Previous Code vs. Compliant Enhancements
+
+The following details show what the previous code failed to handle under audit conditions, and how we resolved it:
+
+| Audit Challenge | Old Code Behavior | Failure Reason | New Code Behavior (The Fix) |
+| :--- | :--- | :--- | :--- |
+| **Multi-line Text Inputs** | Handled literal string `\\n` only. | If users pressed "Enter" in the browser (sending actual `\n` or `\r\n`), `char - ' '` became `10 - 32 = -22`, throwing a **negative index slice panic** and crashing the handler. | Replaces CRLF (`\r\n`) and literal `\\n` with standard `\n`, then splits inputs by `\n` before iterating. |
+| **Non-ASCII Characters (e.g., 😊)** | Passed unchecked to index calculation. | Emojis and other non-ASCII character runes threw **index out-of-bounds panics** during lookups. | Inspects every character in the input loop. If any char is outside `[32, 126]` (excluding normalized newlines), it returns a clear error. |
+| **Empty Form Fields** | Handled with raw text error responses. | Plain text responses look unpolished and do not display well to users. | Catches empty inputs and responds with a beautiful custom HTML 400 page. |
+| **Missing Banner Files** | Triggered basic 404 page. | No distinction made between missing assets vs. corrupted local data. | Performs file size and path checks, returning status-specific templates for 404 and 500 issues. |
+| **Form Resetting** | Inputs vanished on submission. | Page reloaded with empty text boxes and reset selected radios, degrading the user experience. | Struct-bound `PageData` holds form states and re-injects values back into the frontend elements. |
+
+---
+
+## 4. Line-by-Line Code Breakdown
+
+### A. main.go — The Bootstrapper
+`main.go` registers our web routes and kicks off the TCP listener.
 
 ```go
 package main
-```
-**Line 1:** Every Go program starts with a package declaration. `package main` is special — it tells Go this is an executable program, not a library. Go looks for a `main` package to know where to start.
 
----
-
-```go
 import (
-    "fmt"
-    "log"
-    "net/http"
+	"fmt"
+	"log"
+	"net/http"
 )
 ```
-**Lines 3–7:** Import three standard library packages:
-- `fmt` — for printing formatted output to the terminal (used for the startup message)
-- `log` — for logging fatal errors (used if the server fails to start)
-- `net/http` — Go's built-in HTTP server package (handles all web server functionality)
-
-**Why these three?** `net/http` is the core of any Go web server. `fmt` gives us console output. `log` gives us `log.Fatal` which both prints an error AND stops the program — essential for startup failures.
-
----
+* **Line 1**: Declares `package main`, telling Go this compiles to an executable program.
+* **Line 3-7**: Imports:
+  * `"fmt"`: Writes messages to standard console output.
+  * `"log"`: Handles server startup errors.
+  * `"net/http"`: Provides the HTTP router and TCP server.
 
 ```go
 func main() {
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/ascii-art", asciiArtHandler)
+
+	fmt.Println("Server running at http://localhost:8080")
+
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Fatal("Error starting server:", err)
+	}
+}
 ```
-**Line 9:** The `main` function — this is where Go starts executing. Every Go program must have exactly one `main` function in the `main` package.
+* **Line 9**: Declares the application entrypoint `main()`.
+* **Line 10**: Registers `homeHandler` for the `/` pattern. Note that `/` acts as a catch-all router prefix.
+* **Line 11**: Registers `asciiArtHandler` for the `/ascii-art` route.
+* **Line 13**: Prints the startup confirmation to the console.
+* **Line 15**: Starts the server listening on TCP port 8080. If starting fails (e.g., port already bound), it returns an error.
+* **Line 16-18**: Shuts down the application and logs the failure if the port is unavailable.
 
 ---
+
+### B. server.go — Handlers and Logic
+`server.go` contains the handlers, custom page renderer, and string mapping processor.
 
 ```go
-    http.HandleFunc("/", homeHandler)
+type PageData struct {
+	Text     string
+	Banner   string
+	AsciiArt string
+}
 ```
-**Line 10:** Register a route. This tells the Go server: "When any browser request comes to the path `/`, call the function `homeHandler` to handle it."
-- `"/"` — the route pattern (the home page URL)
-- `homeHandler` — the function to call (defined in `server.go`)
-
-**Important:** In Go, the `"/"` pattern is special — it acts as a **catch-all**. Any URL that doesn't match a more specific route will fall through to this handler. That's why `homeHandler` needs to check if the actual path is exactly `"/"` (we handle this in `server.go`).
-
----
-
-```go
-    http.HandleFunc("/ascii-art", asciiArtHandler)
-```
-**Line 11:** Register a second route. "When a request comes to `/ascii-art`, call `asciiArtHandler`." This is where the form submission goes.
-
----
-
-```go
-    fmt.Println("Server running at http://localhost:8080")
-```
-**Line 13:** Print a message to the terminal so the developer knows the server is about to start. This appears when you run `go run .` — it confirms the server is alive.
-
----
-
-```go
-    err := http.ListenAndServe(":8080", nil)
-```
-**Line 15:** Start the HTTP server.
-- `":8080"` — listen on port 8080 on all network interfaces. The colon before the number means "any available address on this machine."
-- `nil` — use Go's default request multiplexer (`DefaultServeMux`), which already knows about the routes we registered above with `HandleFunc`.
-- `err` — this function returns an error if the server fails to start (e.g., port already in use).
-
-**Why port 8080?** Port 80 is the standard HTTP port but requires admin privileges. Port 8080 is the conventional alternative for development servers.
-
----
-
-```go
-    if err != nil {
-        log.Fatal("Error starting server:", err)
-    }
-```
-**Lines 16–18:** Error handling. If `ListenAndServe` returns an error (meaning the server couldn't start):
-- `log.Fatal` prints the error message AND immediately terminates the program with exit code 1.
-- This is appropriate here because if the server can't start, there's nothing else the program can do.
-
-**Why `log.Fatal` instead of `fmt.Println`?** `fmt.Println` just prints — the program would continue running (doing nothing). `log.Fatal` prints AND exits, which is the correct behavior for an unrecoverable startup error.
-
----
-
-## server.go — Handlers and Logic
-
-```go
-package main
-```
-**Line 1:** Same package as `main.go`. In Go, all `.go` files in the same directory with `package main` are compiled together as one program. This is why `homeHandler` and `asciiArtHandler` defined here are accessible from `main.go` without importing anything.
-
----
-
-```go
-import (
-    "html/template"
-    "net/http"
-    "os"
-    "strings"
-    "errors"
-)
-```
-**Lines 3–8:** Four imports:
-- `html/template` — Go's HTML template engine. Parses `.html` files and injects data into them. Uses `html/template` (not `text/template`) because it automatically escapes HTML to prevent XSS attacks.
-- `net/http` — needed for `http.ResponseWriter`, `http.Request`, `http.Error`, and status code constants.
-- `os` — for `os.ReadFile` to read the banner `.txt` files from disk.
-- `strings` — for `strings.ReplaceAll` and `strings.Split` to process file content and user input.
-- `errors` — for `errors.New()` to create descriptive error values when a banner file is not found.
-
----
-
-### homeHandler
+* **Line 12-17**: Defines the context carrier `PageData` structure. It stores input values so they are retained in template fields after form submission.
 
 ```go
 func homeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "405 Error: Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if r.URL.Path != "/" {
+		renderError(w, http.StatusNotFound, "404 Not Found: The page you are looking for does not exist.")
+		return
+	}
 ```
-**Line 10:** Handler function for the `GET /` route.
-- `w http.ResponseWriter` — the outgoing response. We write data to `w` and it gets sent back to the user's browser.
-- `r *http.Request` — the incoming request. Contains the URL, method, form data, headers, etc. The `*` means it's a pointer (reference to the request object).
-
-**Every handler in Go has this exact same signature** — two parameters, `w` and `r`.
-
----
+* **Line 22-25**: Rejects non-`GET` requests with a standard `405 Method Not Allowed`.
+* **Line 28-31**: Intercepts the catch-all behavior of the `/` route. If the path is not exactly `/` (e.g., `/foo`), it returns a styled `404 Not Found` page using the `renderError` helper.
 
 ```go
-    if r.URL.Path != "/" {
-        http.Error(w, "Error loading page", http.StatusNotFound)
-        return
-    }
+	tmpl, err := template.ParseFiles("templates/home.html")
+	if err != nil {
+		renderError(w, http.StatusNotFound, "404 Not Found: Template file (home.html) is missing.")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	err = tmpl.Execute(w, PageData{Banner: "standard"})
+	if err != nil {
+		renderError(w, http.StatusInternalServerError, "500 Internal Server Error: Failed to render home.html template.")
+		return
+	}
+}
 ```
-**Lines 11–14:** Route guard — prevents the catch-all behavior of `"/"`.
-
-**Why is this needed?** Go's `http.HandleFunc("/", ...)` matches not just `/` but also `/anything`, `/foo/bar`, etc. — any URL that doesn't match another registered route. Without this check, visiting `localhost:8080/nonexistent` would show the home page instead of a 404 error.
-
-- `r.URL.Path` — the actual URL path from the browser request
-- `!= "/"` — if the path is anything other than exactly `/`
-- `http.Error(w, "Error loading page", http.StatusNotFound)` — sends a plain text error response with HTTP status 404
-- `http.StatusNotFound` — Go's constant for the number `404`
-- `return` — **critical**: stops the function here. Without `return`, the code below would still execute and try to serve the home page.
+* **Line 34-38**: Compiles `templates/home.html`. If the template file is deleted or renamed, it responds with a `404`.
+* **Line 40**: Sets the HTTP response status to `200 OK`.
+* **Line 42**: Executes the template, selecting `standard` as the default checked radio button.
+* **Line 43-46**: If rendering fails, it falls back to a `500 Internal Server Error` response.
 
 ---
-
-```go
-    tmpl, err := template.ParseFiles("templates/home.html")
-```
-**Line 16:** Load and parse the HTML template file.
-- `template.ParseFiles(...)` reads the file from disk and parses it into a template object.
-- Returns two values: `tmpl` (the parsed template) and `err` (any error that occurred).
-- `"templates/home.html"` — the file path relative to where the Go program is run from (the project root).
-
-**Why parse every request?** For simplicity. In production, you'd parse once at startup and reuse. For this project, parsing each time is fine and makes the code clearer.
-
----
-
-```go
-    if err != nil {
-        http.Error(w, "Error loading template", http.StatusNotFound)
-        return
-    }
-```
-**Lines 17–20:** If the template file couldn't be found or parsed:
-- Send a 404 error to the browser
-- `return` to stop execution
-
-**Why 404?** The spec says "404 Not Found, if nothing is found, for example templates or banners." A missing template file is a "not found" scenario.
-
-**Why not `log.Fatal`?** Because `log.Fatal` would kill the entire server for all users. Inside a handler, we only want to fail for this one request while keeping the server running for everyone else.
-
----
-
-```go
-    w.WriteHeader(http.StatusOK)
-
-    err = tmpl.Execute(w, ...)
-    if err != nil {
-        http.Error(w, "500 Internal Server Error:\nError rendering template", http.StatusInternalServerError)
-        return
-    }
-```
-**Line 21:** Send the response and render the template
-
-* `w.WriteHeader(http.StatusOK)` sends an HTTP status code `200 OK` to the browser, indicating that the request was successful.
-
-* `tmpl.Execute(w, "")` renders the HTML template and sends an empty string to `{{ . }}`, so no content is displayed in the template initially.
-  * `w` is the response writer where the HTML output is sent.
-  * `result` contains the generated ASCII art text.
-
-* Inside the HTML template, `{{ . }}` represents the data passed to `Execute()`.
-  This means the ASCII art stored in `result` will appear wherever `{{ . }}` is placed in the template.
-
-* If template rendering fails, the `if err != nil` block handles the error by:
-
-  * Sending a `500 Internal Server Error` response to the client.
-  * Displaying an error message in the browser.
-  * Stopping further execution using `return`.
-
-* As a result, the browser receives a fully rendered HTML page containing the generated ASCII art inside the `<pre>` tag.
-
----
-
-### asciiArtHandler
 
 ```go
 func asciiArtHandler(w http.ResponseWriter, r *http.Request) {
-```
-**Line 24:** Handler for the `POST /ascii-art` route. Same signature as every Go handler.
+	if r.Method != http.MethodPost { 
+		renderError(w, http.StatusMethodNotAllowed, "HTTP Method Not Allowed: Use POST to generate ASCII art.")
+		return
+	}
 
----
+	text := r.FormValue("text")
+	if text == "" { 
+		renderError(w, http.StatusBadRequest, "Bad Request: Input text cannot be empty.")
+		return
+	}
 
-```go
-    if r.Method != http.MethodPost {
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-```
-**Lines 25–28:** Method guard — only allow POST requests.
-- `r.Method` — the HTTP method of the incoming request (GET, POST, PUT, DELETE, etc.)
-- `http.MethodPost` — Go's constant for the string `"POST"`
-- `!= ` — "not equal to"
-- If someone sends a GET request to `/ascii-art` (e.g., by typing it in the browser URL bar), they get a 405 error instead of the handler trying to process a non-existent form.
-- `http.StatusMethodNotAllowed` — Go's constant for `405`
-
-**Why is this necessary?** `http.HandleFunc("/ascii-art", asciiArtHandler)` registers the handler for ALL methods, not just POST. Without this guard, a GET request to `/ascii-art` would try to read empty form data and fail confusingly.
-
----
-
-```go
-    text := r.FormValue("text")
-    if text == "" {
-        http.Error(w, "Text cannot be empty", http.StatusBadRequest)
-        return
-    }
-```
-**Lines 30–34:** Extract and validate the user's text input.
-- `r.FormValue("text")` — retrieves the value of the form field named `"text"` from the POST request body. The `"text"` matches the `name="text"` attribute on the `<input>` element in `home.html`.
-- `text == ""` — if the user submitted the form without typing anything
-- `http.StatusBadRequest` — Go's constant for `400`. The spec says "400 Bad Request, for incorrect requests."
-
----
-
-```go
-    banner := r.FormValue("banner")
-    if banner != "standard" && banner != "shadow" && banner != "thinkertoy" {
-        http.Error(w, "400 Bad Request:\nInvalid banner", http.StatusBadRequest)
-        return
-    }
-```
-**Lines 36–40:** Extract and validate the banner selection.
-- `r.FormValue("banner")` — gets the selected radio button value. The `"banner"` matches `name="banner"` on the radio inputs in `home.html`.
-- Validates that the banner is one of the three known values. Prevents path traversal attacks where someone could send banner=../../etc/passwd to read arbitrary files.
-
----
-
-```go
-    result, err := AsciiArt(text, banner)
-    if err != nil {
-        http.Error(w, "404 Not Found:\nError loading banner file", http.StatusNotFound)
-        return
-    }
-```
-**Lines 42–46:** Generate the ASCII art and validate the output.
-- `AsciiArt(text, banner)` — AsciiArt now returns two values. If err is not nil, the banner file was missing — return 404.
-
----
-
-```go
-	w.WriteHeader(http.StatusOK)
-
-	err = tmpl.Execute(w, result)
- 	if err != nil {
-    	http.Error(w, "500 Internal Server Error:\nError rendering template", http.StatusInternalServerError)
-    	return
+	banner := r.FormValue("banner")	
+	if banner != "standard" && banner != "shadow" && banner != "thinkertoy" {
+		renderError(w, http.StatusBadRequest, "Bad Request: Invalid banner style selected.")
+		return
 	}
 ```
-**Lines 48–53:** Send the response and render the template
-
-* `w.WriteHeader(http.StatusOK)` sends an HTTP status code `200 OK` to the browser, indicating that the request was successful.
-
-* `tmpl.Execute(w, result)` renders the HTML template and injects the `result` data into it.
-
-  * `w` is the response writer where the HTML output is sent.
-  * `result` contains the generated ASCII art text.
-
-* Inside the HTML template, `{{ . }}` represents the data passed to `Execute()`.
-  This means the ASCII art stored in `result` will appear wherever `{{ . }}` is placed in the template.
-
-* If template rendering fails, the `if err != nil` block handles the error by:
-
-  * Sending a `500 Internal Server Error` response to the client.
-  * Displaying an error message in the browser.
-  * Stopping further execution using `return`.
-
-* As a result, the browser receives a fully rendered HTML page containing the generated ASCII art inside the `<pre>` tag.
-
-
----
-
-### AsciiArt Function
+* **Line 53-56**: Limits route requests to the `POST` method.
+* **Line 59-63**: Retrieves the `text` field from the form. If empty, it returns a `400 Bad Request`.
+* **Line 66-70**: Retrieves the `banner` field and checks it against our allowed styles to prevent path traversal attacks.
 
 ```go
-func AsciiArt(input string, banners string) (string, error)
+	result, err := AsciiArt(text, banner)
+	if err != nil {
+		if err.Error() == "Invalid character in input" {
+			renderError(w, http.StatusBadRequest, "Bad Request: Input contains invalid characters. Only printable ASCII characters (32-126) are allowed.")
+		} else if err.Error() == "banner file not found" || err.Error() == "corrupted banner file" {
+			renderError(w, http.StatusNotFound, "404 Not Found: The selected banner file is missing or corrupted.")
+		} else {
+			renderError(w, http.StatusInternalServerError, "500 Internal Server Error: An error occurred: "+err.Error())
+		}
+		return
+	}
 ```
-**Line 57:** The core function that generates ASCII art.
-- `input string` — the text the user typed (e.g., `"Hello"`)
-- `banners string` — the banner name (e.g., `"standard"`, `"shadow"`, or `"thinkertoy"`)
-- Returns `(string, error)` — the ASCII art and nil on success, or empty string and an error on failure
-
-**This is NOT a handler function** — it doesn't have `w` and `r` parameters. It's a pure helper function that takes input and returns output.
-
----
+* **Line 73**: Calls `AsciiArt(text, banner)` to compute the character block lines.
+* **Line 74-83**: Checks if the helper returned an error:
+  * `"Invalid character in input"` -> status `400 Bad Request`.
+  * `"banner file not found"` or `"corrupted banner file"` -> status `404 Not Found`.
+  * Other errors -> status `500 Internal Server Error`.
 
 ```go
-    filePath := "banners/" + banners + ".txt"
-```
-**Line 58:** Build the file path dynamically.
-- If `banners` is `"standard"`, this becomes `"banners/standard.txt"`
-- If `banners` is `"shadow"`, this becomes `"banners/shadow.txt"`
-- String concatenation with `+`
+	if _, err := os.Stat("templates/home.html"); os.IsNotExist(err) {
+		renderError(w, http.StatusNotFound, "Template file (home.html) is missing.")
+		return
+	}
 
----
+	tmpl, err := template.ParseFiles("templates/home.html")
+	if err != nil {
+		renderError(w, http.StatusInternalServerError, "Internal Server Error: Failed to parse home.html template.")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 
-```go
-    inputFile, err := os.ReadFile(filePath)
-    if err != nil {
-        return "", errors.New("banner file not found")
-    }
-```
-**Lines 60–63:** Read the banner file from disk.
-- `os.ReadFile(filePath)` — reads the entire file into memory as a `[]byte` (byte slice).
-- Returns `inputFile` (the file contents) and `err` (any error).
-- If the file doesn't exist or can't be read, return `""` to signal failure.
+	data := PageData{
+		Text:     text,
+		Banner:   banner,
+		AsciiArt: result,
+	}
 
----
-
-```go
-    content := strings.ReplaceAll(string(inputFile), "\r\n", "\n")
-```
-**Line 65:** Normalize line endings.
-- `string(inputFile)` — convert `[]byte` to a `string` (Go requires explicit type conversion).
-- `strings.ReplaceAll(..., "\r\n", "\n")` — replace Windows line endings (`\r\n`) with Unix line endings (`\n`).
-- **Why?** Banner files might have been created or edited on Windows. Windows uses `\r\n` for newlines, Unix/Mac uses `\n`. If we don't normalize, `strings.Split` would leave invisible `\r` characters in each line, corrupting the ASCII art alignment.
-
----
-
-```go
-    inputFileLines := strings.Split(content, "\n")
-```
-**Line 66:** Split the banner file into individual lines.
-- Turns the entire file content into a **slice (array) of strings**, one per line.
-- After this, `inputFileLines[0]` is the first line, `inputFileLines[1]` is the second, etc.
-- This lets us access any specific line by its index number — which is how we look up character art.
-
----
-
-```go
-    words := strings.Split(input, "\\n")
-```
-**Line 68:** Split the user's input on the literal `\n` escape sequence.
-- `"\\n"` in Go source code represents the **literal two-character string** `\n` (backslash followed by n).
-- **Why `\\n` and not `\n`?** In Go, `"\n"` is a real newline character. But the user types a literal backslash-n in the text box (e.g., `Hello\nWorld`). The browser sends this as the characters `\`, `n` — not an actual newline. So we split on the literal `\n`.
-- Result: if the user types `Hello\nWorld`, `words` becomes `["Hello", "World"]`.
-
----
-
-```go
-    result := ""
-```
-**Line 69:** Initialize an empty string to accumulate the ASCII art output. Each line of art gets appended to this.
-
----
-
-```go
-    for _, word := range words {
-```
-**Line 71:** Loop through each word (each line of text the user wants rendered).
-- `range words` — iterates over the `words` slice.
-- `_` — the index (we don't need it, so we discard it with `_`).
-- `word` — the current word/line being processed.
-
----
-
-```go
-if input == "" {
-    return "", nil
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		http.Error(w, "500 Internal Server Error:\nError rendering template", http.StatusInternalServerError)
+		return
+	}
 }
 ```
-
-### Explanation
-
-* This condition checks whether the user entered an empty string as input.
-
-* If `input` is empty, the function immediately stops execution and returns:
-
-  * `""` → an empty result string
-  * `nil` → meaning no error occurred
-
-* This prevents the program from trying to generate ASCII art when no text was provided.
-
-
-```go
-        if word == "" {
-            result += "\n"
-            continue
-        }
-```
-**Lines 72–75:** Handle empty lines.
-- If the user typed `Hello\n\nWorld`, splitting produces `["Hello", "", "World"]`. The empty string `""` represents a blank line between "Hello" and "World".
-- `result += "\n"` — add a blank line to the output.
-- `continue` — skip to the next word (don't try to render an empty word through the character loop).
+* **Line 87-97**: Validates that `home.html` exists and parses it.
+* **Line 96**: Sets the HTTP status code to `200 OK`.
+* **Line 99-103**: Bundles the input text, selected banner, and resulting ASCII art into the `PageData` struct.
+* **Line 106**: Executes the template, rendering the page with the ASCII art.
 
 ---
 
 ```go
-        for i := 0; i < 8; i++ {
+func renderError(w http.ResponseWriter, status int, msg string) {
+	w.WriteHeader(status)
+	tmpl, err := template.ParseFiles("templates/error.html")
+	if err != nil {
+		http.Error(w, msg, status)
+		return
+	}
+	tmpl.Execute(w, map[string]interface{}{
+		"Status": status,
+		"Message": msg,
+	})
+}
 ```
-**Line 76:** Inner loop — iterate 8 times, once for each line of the ASCII character art.
-- Every character in the banner file is represented by exactly **8 lines** of text art.
-- `i` is the current line number (0 through 7) of the character being built.
+* **Line 115-128**: **The `renderError` helper**. 
+  * Sets the response header to the provided HTTP status code.
+  * Attempts to load `templates/error.html`.
+  * If the template is missing, it falls back to Go's default plain-text handler.
+  * Otherwise, it renders the custom error page with the status code and details.
 
 ---
 
 ```go
-            for _, char := range word {
-```
-**Line 77:** Innermost loop — iterate through each character in the current word.
-- `range word` iterates over the string character by character.
-- `char` is a `rune` (Go's type for a single character, representing its Unicode/ASCII value).
+func AsciiArt(input string, banners string) (string, error) {
+	filePath := "banners/" + banners + ".txt"
 
----
+	inputFile, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", errors.New("banner file not found")
+	}
+
+	content := strings.ReplaceAll(string(inputFile), "\r\n", "\n")
+	inputFileLines := strings.Split(content, "\n")
+```
+* **Line 132-138**: Builds the file path and reads the requested banner file.
+* **Line 140**: Normalizes Windows carriage returns (`\r\n`) to standard Unix newlines (`\n`) to ensure consistent indexing.
+* **Line 141**: Splits the banner file content by `\n` into a slice of strings.
 
 ```go
-                result += inputFileLines[i+(int(char-' ')*9)+1]
+	if len(inputFileLines) < 855 {
+		return "", errors.New("corrupted banner file")
+	}
+
+	input = strings.ReplaceAll(input, "\r\n", "\n")
+	input = strings.ReplaceAll(input, "\\n", "\n")
 ```
-**Line 78:** **The core formula** — this is the most important line in the entire project. It looks up the correct line in the banner file for the current character and current row.
-
-Breaking it down piece by piece:
-
-1. **`char - ' '`** — Calculate the character's position relative to the space character.
-   - `' '` (space) has ASCII value 32.
-   - `'A'` has ASCII value 65, so `'A' - ' '` = 65 - 32 = **33**.
-   - This gives us which character block to look at in the banner file.
-
-2. **`(char - ' ') * 9`** — Each character occupies **9 lines** in the banner file (8 lines of art + 1 blank separator line between characters). Multiplying by 9 jumps to the start of the correct character's block.
-
-3. **`+ 1`** — Skip the blank separator line at the start of each character block. The first line of each block is empty, so `+1` moves past it.
-
-4. **`+ i`** — Add the current row number (0–7) to get the specific line within that character's 8-line block.
-
-5. **`int(...)`** — Convert the result to an `int` because Go requires array indices to be integers.
-
-**Example:** To get line 3 (i=2) of the character `'A'` (position 33):
-```
-Index = 2 + (33 * 9) + 1 = 2 + 297 + 1 = 300
-```
-So `inputFileLines[300]` gives us the 3rd line of the letter A's ASCII art.
-
----
+* **Line 144-146**: Validates the banner size. Each of the 95 printable characters requires 9 lines of data (8 art lines + 1 blank separator line). `95 * 9 = 855` lines.
+* **Line 149-150**: Normalizes all input newlines (both actual newlines and the literal string `\n`) to standard `\n`.
 
 ```go
-            result += "\n"
-```
-**Line 80:** After printing one row of all characters in the word, add a newline to move to the next row.
+	if input == "" {
+		return "", nil
+	}
 
----
+	onlyNewLine := true
+	for _, char := range input {
+		if char != '\n' {
+			onlyNewLine = false
+			break
+		}
+	}
+	if onlyNewLine {
+		return input, nil
+	}
+```
+* **Line 153-155**: Empty input returns immediately without rendering.
+* **Line 158-168**: If the input consists only of newline characters, it returns them directly. This matches standard `ascii-art` behavior.
 
 ```go
-    return result
-```
-**Line 83:** Return the complete ASCII art string.
+	words := strings.Split(input, "\n")
+	result := ""
 
----
+	for _, word := range words {
+		if word == "" {
+			result += "\n"
+			continue
+		}
 
-## templates/home.html — The Frontend
-
-### HTML Structure
-
-```html
-<!DOCTYPE html>
-```
-**Line 1:** Document type declaration. Tells the browser this is an HTML5 document. Every modern HTML page starts with this.
-
----
-
-```html
-<html lang="en">
-```
-**Line 2:** Root HTML element. `lang="en"` tells the browser and search engines the page is in English.
-
----
-
-```html
-<head>
-    <meta charset="UTF-8">
-    <title>ASCII Art Generator</title>
-```
-**Lines 3–5:**
-- `<head>` — contains metadata about the page (not visible content).
-- `<meta charset="UTF-8">` — character encoding. UTF-8 supports all characters including special symbols the user might type.
-- `<title>` — the text shown in the browser tab.
-
----
-
-### CSS Styling
-
-```css
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px;
+		for i := 0; i < 8; i++ {
+			for _, char := range word {
+				if char < 32 || char > 126 {
+					return "", errors.New("Invalid character in input")
+				}
+				result += inputFileLines[i+(int(char-' ')*9)+1]
+			}
+			result += "\n"
+		}
+	}
+	return result, nil
 }
 ```
-**Lines 7–14:** Style the page body.
-- `font-family: Arial, sans-serif` — use Arial font, fall back to any sans-serif font.
-- `background-color: #f4f4f4` — light grey background.
-- `display: flex` — use CSS Flexbox layout, which makes centering easy.
-- `flex-direction: column` — stack child elements vertically (top to bottom).
-- `align-items: center` — center everything horizontally on the page.
-- `padding: 40px` — space between the page edge and the content.
+* **Line 169**: Splits the input string into a slice of words using `\n`.
+* **Line 172-176**: Iterates through each word. If a word is empty, it appends a single newline to `result`.
+* **Line 178**: The row iterator. Each ASCII character block is 8 lines tall.
+* **Line 179**: Iterates through each character in the word.
+* **Line 181-183**: **Printable range check**. If a character's rune value falls outside `[32, 126]` (printable ASCII range), it returns an error.
+* **Line 184**: **Index formula lookup**. Jumps to the start of the character's block in the slice and adds the current row index `i` plus 1 (skipping the blank separator line).
+* **Line 186**: Appends a newline after rendering the current row for all characters in the word.
 
 ---
 
-```css
-h1 {
-    margin-bottom: 20px;
-    color: #333;
-}
-```
-**Lines 16–19:** Style the title heading with dark grey color and space below it.
+## 5. Frontend Templates
+
+### A. home.html — Main Interface
+`templates/home.html` provides the interactive GUI, styled using modern dark-theme CSS.
+
+* **`<textarea>` upgrade**:
+  ```html
+  <textarea id="text-input" name="text" placeholder="..." required>{{ .Text }}</textarea>
+  ```
+  Uses a textarea for multi-line inputs, and populates it with `{{ .Text }}` to preserve input values.
+* **Stateful Radio Cards**:
+  ```html
+  <input type="radio" name="banner" value="standard" {{ if or (eq .Banner "standard") (eq .Banner "") }}checked{{ end }}>
+  ```
+  Pre-selects standard by default, or maintains the user's selection on page reload.
+* **Monospaced Viewer Container**:
+  ```html
+  {{ if .AsciiArt }}
+  <div class="result-container">
+      <div class="result-header">
+          <span>Output Art</span>
+          <button class="copy-btn" id="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+      </div>
+      <pre id="ascii-output">{{ .AsciiArt }}</pre>
+  </div>
+  {{ end }}
+  ```
+  Conditionally renders the results section, displaying the ASCII art inside a monospace block with a copy button.
 
 ---
 
-```css
-form {
-    background: #fff;
-    padding: 24px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    width: 400px;
-}
-```
-**Lines 21–30:** The form appears as a white card.
-- `background: #fff` — white background.
-- `border-radius: 8px` — rounded corners.
-- `box-shadow: 0 2px 6px rgba(0,0,0,0.1)` — subtle shadow beneath the card for depth. `rgba(0,0,0,0.1)` is black at 10% opacity.
-- `display: flex; flex-direction: column` — stack form elements vertically.
-- `gap: 16px` — equal spacing between each form element.
-- `width: 400px` — fixed width.
+### B. error.html — Error Page
+`templates/error.html` provides a clean error display page.
+
+* **Dynamic Code & Message Binding**:
+  ```html
+  <div class="error-code">{{ .Status }}</div>
+  <h1>An Error Occurred</h1>
+  <p>{{ .Message }}</p>
+  ```
+  Binds the HTTP status code (e.g., 400 or 404) and detail message dynamically using template keys.
 
 ---
 
-```css
-label {
-    font-weight: bold;
-    color: #444;
-}
-```
-**Lines 32–35:** Make labels bold and dark grey.
+## 6. server_test.go — Testing Suite
+`server_test.go` verifies the application logic against various edge cases.
 
----
-
-```css
-input[type="text"] {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
-    width: 100%;
-}
-```
-**Lines 37–43:** Style the text input field.
-- `input[type="text"]` — CSS selector that targets only text inputs (not radio buttons or submit buttons).
-- `width: 100%` — fill the full width of the form card.
-
----
-
-```css
-.banner-options {
-    display: flex;
-    gap: 16px;
-}
-```
-**Lines 45–48:** The radio buttons are wrapped in a `<div class="banner-options">`. This makes them display side by side (horizontally) with 16px spacing.
-
----
-
-```css
-input[type="submit"] {
-    padding: 10px;
-    background-color: #333;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-input[type="submit"]:hover {
-    background-color: #555;
-}
-```
-**Lines 50–62:** Submit button styling.
-- Dark background, white text, no default border.
-- `cursor: pointer` — changes the mouse cursor to a hand when hovering.
-- `:hover` — when the user hovers over the button, it lightens to `#555` for visual feedback.
-
----
-
-```css
-pre {
-    margin-top: 30px;
-    background: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    font-size: 14px;
-    overflow-x: auto;
-    max-width: 90%;
-}
-```
-**Lines 64–73:** Style for the ASCII art output area.
-- `overflow-x: auto` — if the ASCII art is wider than the screen, add a horizontal scrollbar instead of breaking the layout.
-- `max-width: 90%` — prevent the output from touching the page edges.
-- Same white card style as the form for visual consistency.
-
----
-
-### HTML Body Content
-
-```html
-<h1>ASCII Art Generator</h1>
-```
-**Line 77:** Page title visible to the user.
-
----
-
-```html
-<form action="/ascii-art" method="POST">
-```
-**Line 79:** The form element that wraps all input fields.
-- `action="/ascii-art"` — when submitted, send the data to the `/ascii-art` route (which maps to `asciiArtHandler` in Go).
-- `method="POST"` — use the POST HTTP method (data goes in the request body, not the URL).
-
-**Why POST and not GET?**
-- GET puts data in the URL (e.g., `?text=Hello&banner=standard`), which has length limits and exposes data.
-- POST sends data in the request body — better for form submissions with user input.
-
----
-
-```html
-<label>Enter text:</label>
-<input type="text" name="text" placeholder="Type something...">
-```
-**Lines 80–81:**
-- `<label>` — descriptive text telling the user what to type.
-- `<input type="text">` — a single-line text input box.
-- `name="text"` — **this is critical**. This `name` must match exactly what the Go handler reads with `r.FormValue("text")`. If these don't match, the server won't receive the data.
-- `placeholder="Type something..."` — grey hint text that disappears when the user starts typing.
-
----
-
-```html
-<label>Select banner:</label>
-<div class="banner-options">
-    <label><input type="radio" name="banner" value="standard"> Standard</label>
-    <label><input type="radio" name="banner" value="shadow"> Shadow</label>
-    <label><input type="radio" name="banner" value="thinkertoy"> Thinkertoy</label>
-</div>
-```
-**Lines 83–88:** Banner selection using radio buttons.
-- `type="radio"` — circular buttons where only one can be selected at a time.
-- `name="banner"` — all three share the same `name`. This is how HTML knows they're a group (selecting one deselects the others). Matches `r.FormValue("banner")` in Go.
-- `value="standard"` / `"shadow"` / `"thinkertoy"` — the value sent to the server when that option is selected. These match exactly what `AsciiArt` expects as the `banners` parameter to build the file path: `"banners/" + "standard" + ".txt"`.
-- Each `<input>` is wrapped in a `<label>` so clicking the text also selects the radio button.
-
----
-
-```html
-<input type="submit" value="Generate">
-```
-**Line 90:** The submit button.
-- `type="submit"` — clicking this triggers the form submission.
-- `value="Generate"` — the text displayed on the button.
-
----
-
-```html
-</form>
-
-<pre>{{ . }}</pre>
-```
-**Lines 91–93:** Close the form, then display the result.
-- `<pre>` — preformatted text element. It preserves all spaces and line breaks exactly as they appear. Without `<pre>`, the browser would collapse multiple spaces into one and the ASCII art would look broken.
-- `{{ . }}` — **Go template syntax**. The dot `.` represents the data passed in `tmpl.Execute(w, data)`. 
-  - When `homeHandler` calls `tmpl.Execute(w, "")`, `{{ . }}` becomes an empty string — nothing visible.
-  - When `asciiArtHandler` calls `tmpl.Execute(w, result)`, `{{ . }}` becomes the full ASCII art output.
-
----
-
-## server_test.go — Tests
-
-```go
-package main
-```
-**Line 1:** Same package as the code being tested. In Go, test files in the same package can access all functions directly.
-
----
-
-```go
-import (
-    "strings"
-    "testing"
-)
-```
-**Lines 3–6:**
-- `strings` — used for `strings.Split` and `strings.TrimRight` to analyze output.
-- `testing` — Go's built-in testing package. Provides the `*testing.T` type for test assertions.
-
----
-
-**Test functions** — each follows Go's convention: function name starts with `Test`, takes `*testing.T` as the only parameter.
-
-| Test | What it checks |
-|------|-------|
-| `TestAsciiArtValidBanner` | `"Hello" + "standard"` produces non-empty output, no error |
-| `TestAsciiArtShadowBanner` | `"Hello" + "shadow"` produces non-empty output, no error |
-| `TestAsciiArtThinkertoyBanner` | `"Hello" + "thinkertoy"` produces non-empty output, no error |
-| `TestAsciiArtInvalidBanner` | `"Hello" + "nonexistent"` returns error |
-| `TestAsciiArtEmptyInput` | `"" + "standard"` returns empty string, no error |
-| `TestAsciiArtNewline` | `"Hi\\nHi"` produces more than 8 lines |
-| `TestAsciiArtOutputHasEightLinesPerWord` | `"Hi"` produces exactly 8 lines |
-| `TestAsciiArtSpecialCharacters` | `"123??" + "standard"` produces non-empty output |
-| `TestHomeHandler` | GET `"/"` returns 200 |
-| `TestHomeHandlerInvalidPath` | GET `/invalid` returns 404 |
-| `TestAsciiArtHandlerReturns200` | POST `/ascii-art` with valid data returns 200 |
-| `TestAsciiArtHandlerEmptyText` | POST with empty text returns 400 |
-| `TestAsciiArtHandlerInvalidBanner` | POST with invalid banner returns 400 |
-| `TestAsciiArtHandlerWrongMethod` | GET `/ascii-art` returns 405 |
-| `TestAsciiArtHandlerMultiLine` | POST with `Hello\nWorld` returns 200 |
-
-Run all tests with:
-```bash
-go test ./... -v
-```
-
----
-
-## Banner Files
-
-Each banner file (`standard.txt`, `shadow.txt`, `thinkertoy.txt`) follows the same structure:
-
-- Contains the ASCII art for every printable character from space (ASCII 32) to tilde (ASCII 126).
-- Each character is represented by **8 lines** of art.
-- Between each character block there is **1 blank separator line**.
-- So each character occupies **9 lines** total in the file.
-
-**Example structure** (simplified):
-```
-                        ← blank separator (line 0)
- _                      ← line 1 of '!' (8 lines follow)
-| |                     ← line 2 of '!'
-| |                     ← line 3 of '!'
-| |                     ← ...
-|_|
-(_)
-
-                        ← blank separator
-                        ← line 1 of '"' ...
-```
-
-**The formula `i + (int(char-' ') * 9) + 1` navigates this structure:**
-- `(char - ' ')` → which character (0 for space, 1 for !, 2 for ", ...)
-- `* 9` → jump to that character's block
-- `+ 1` → skip the blank separator at the start
-- `+ i` → select the specific line (0-7) within the block
-
----
-
-## HTTP Status Codes Used
-
-| Code | Constant | Where Used | When |
-|------|----------|------------|------|
-| 200 | (default) | `tmpl.Execute` | Template renders successfully — Go sends 200 automatically |
-| 400 | `http.StatusBadRequest` | `asciiArtHandler` | Text or banner field is empty |
-| 404 | `http.StatusNotFound` | `homeHandler`, `asciiArtHandler` | Invalid URL path or template file missing |
-| 405 | `http.StatusMethodNotAllowed` | `asciiArtHandler` | Request method is not POST |
-| 500 | `http.StatusInternalServerError` | `asciiArtHandler` | `AsciiArt` function returns empty (banner file unreadable) |
+* **`TestAsciiArtInvalidCharacter`**:
+  Verifies that non-printable characters return an error:
+  ```go
+  _, err := AsciiArt("Hello 😊", "standard")
+  if err == nil { ... }
+  ```
+* **`TestAsciiArtActualNewline`**:
+  Verifies that actual newlines (`\n`) are processed without throwing panics.
+* **`TestAsciiArtOnlyNewlines`**:
+  Verifies that an input containing only newlines returns them unmodified.
+* **`TestAsciiArtHandlerInvalidCharacter`**:
+  Verifies that posting invalid characters to `/ascii-art` returns a `400 Bad Request`.
