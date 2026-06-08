@@ -1,21 +1,21 @@
-# 🎨 ASCII Art Web Generator
+# ASCII Art Web Generator
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/jezreal-dev/ascii-art-web-generator?color=00ADD8&style=for-the-badge&logo=go)](https://golang.org/)
-[![Docker Support](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![GitHub Actions CI](https://img.shields.io/github/actions/workflow/status/jezreal-dev/ascii-art-web-generator/go-ci.yml?branch=main&style=for-the-badge&logo=github-actions&label=CI)](https://github.com/jezreal-dev/ascii-art-web-generator/actions)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![CI](https://img.shields.io/github/actions/workflow/status/jezreal-dev/ascii-art-web-generator/go-ci.yml?branch=main&style=for-the-badge&logo=github-actions&label=CI)](https://github.com/jezreal-dev/ascii-art-web-generator/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-An interactive, production-grade web application and JSON REST API that converts text into beautiful, monospaced ASCII banner art. Features a premium glassmorphic dark interface, real-time AJAX generations, input validation, and containerized deployment workflow.
+An interactive web application and JSON API that converts text into monospaced ASCII banner art. It features a dark glassmorphic UI, async form submissions, input validation, and containerized deployment workflow.
 
 ---
 
-## 📌 Architecture Layout
+## System Architecture
 
 ```mermaid
 graph TD
-    Client[Web Browser / API Client] -->|HTTP Requests| Router[Go DefaultServeMux Router]
+    Client[Browser / API Client] -->|HTTP Requests| Router[Go DefaultServeMux]
     
-    subgraph Handlers [HTTP Request Handlers]
+    subgraph Handlers [Request Handlers]
         Router -->|GET /| Home[homeHandler]
         Router -->|GET /generator| Gen[generatorHandler]
         Router -->|POST /ascii-art| Form[asciiArtHandler]
@@ -23,94 +23,94 @@ graph TD
         Router -->|GET /privacy & /terms| Legal[legalHandler]
     end
 
-    subgraph Core [Core Processing Engine]
+    subgraph Core [Processing Engine]
         Form -->|Process Text| Art[AsciiArt Engine]
         JSON -->|Process JSON| Art
         Art -->|Read Font Data| Banners[(banners/*.txt)]
     end
 
-    subgraph Presentation [Templates & Views]
+    subgraph Presentation [Views]
         Home -->|Render Landing| LandingTmpl[landing.html]
-        Gen -->|Render Interface| HomeTmpl[home.html]
-        Legal -->|Render Policy| LegalTmpl[legal.html]
+        Gen -->|Render Tool| HomeTmpl[home.html]
+        Legal -->|Render Terms| LegalTmpl[legal.html]
         Router -->|Render Errors| ErrorTmpl[error.html]
     end
 ```
 
 ---
 
-## ✨ Features
+## Features
 
-- ⚡ **Asynchronous Generation**: Text-to-art conversion happens instantly via JavaScript AJAX `fetch` calls, without full page reloads.
-- 🎨 **Harmonious Glassmorphism UI**: High-end styling featuring responsive grids, modern typography, stateful font selector cards, and custom micro-interactions.
-- 📋 **Copy to Clipboard**: Quick copy button with transition animations and visual feedback alerts.
-- 🛡️ **Edge-case Safety**: Validates input runes against standard printable ASCII bounds `[32, 126]`, preventing buffer overruns or negative-indexing crashes.
-- 🐳 **Docker Containerized**: Multi-stage Docker deployment setup for minimal production container footprint.
-- 🤖 **CI/CD Configured**: Automated tests and compilation runs on every GitHub branch push.
-
----
-
-## 🛠️ Tech Stack
-
-- **Backend Language:** Go (Golang)
-- **Frontend Presentation:** HTML5, Vanilla CSS3 (Glassmorphism), Vanilla JavaScript ES6
-- **CI/CD & Deployment:** GitHub Actions, Docker, Render Cloud
-- **Fonts Supported:** Standard, Shadow, Thinkertoy
+- **Asynchronous Generation:** Dynamic AJAX fetch requests handle text-to-art conversion in real-time, eliminating page refreshes.
+- **Modern Glassmorphic UI:** Built with raw CSS styling. Fully responsive grid layouts, custom font selectors, and micro-interactions.
+- **Copy to Clipboard:** Quick clipboard copier with dynamic transition alerts.
+- **Rune Bounds Validation:** Input validation ensures characters are strictly within printable ASCII range `[32, 126]` to prevent indexing exceptions.
+- **Docker Ready:** Multi-stage Dockerfile configured for minimal image size.
+- **Continuous Integration:** Automated build and test suite runs on every GitHub branch push.
 
 ---
 
-## 🚀 Getting Started
+## Tech Stack
+
+- **Backend:** Go (Golang)
+- **Frontend:** HTML5, CSS3, JavaScript (ES6)
+- **CI/CD & DevOps:** GitHub Actions, Docker, Render Cloud
+- **Banners:** Standard, Shadow, Thinkertoy
+
+---
+
+## Setup & Running
 
 ### Prerequisites
 
-- Go (1.18+ recommended)
-- Docker (optional, for containerized run)
+- Go (1.18+)
+- Docker (optional)
 
-### Running Locally (Go Toolchain)
+### Local Build
 
-1. Clone the repository and navigate to the root directory:
+1. Clone and navigate to the project directory:
    ```bash
    git clone https://github.com/jezreal-dev/ascii-art-web-generator.git
    cd ascii-art-web-generator
    ```
 
-2. Start the local server:
+2. Start the server:
    ```bash
    go run .
    ```
 
-3. Open your browser and navigate to:
-   - **Landing Page**: `http://localhost:8080/`
-   - **Generator Tool**: `http://localhost:8080/generator`
+3. Open your browser:
+   - **Landing Page:** `http://localhost:8080/`
+   - **Generator:** `http://localhost:8080/generator`
 
 ---
 
-### Running with Docker
+### Docker Deployment
 
-1. Build the lightweight production Docker image:
+1. Build the image:
    ```bash
    docker build -t ascii-art-generator .
    ```
 
-2. Run the container and map the port:
+2. Run the container:
    ```bash
    docker run -p 8080:8080 ascii-art-generator
    ```
 
-3. Access the application at `http://localhost:8080/generator`.
+3. Access the generator at `http://localhost:8080/generator`.
 
 ---
 
-## 📡 REST API Specifications
+## JSON REST API
 
-The application includes a clean JSON REST API endpoint for third-party integrations or headless generations.
+The service exposes a JSON endpoint for third-party scripts or API integration.
 
-### Generate ASCII Art
+### Generate Art
 
 - **Endpoint:** `POST /api/ascii-art`
-- **Content-Type:** `application/json`
+- **Headers:** `Content-Type: application/json`
 
-#### Request Payload
+#### Request Schema
 ```json
 {
   "text": "Hello World",
@@ -118,14 +118,14 @@ The application includes a clean JSON REST API endpoint for third-party integrat
 }
 ```
 
-#### Successful Response (`200 OK`)
+#### Response (200 OK)
 ```json
 {
   "result": " _    _          _   _          \n| |  | |        | | | |         \n| |__| |   ___  | | | |   ___   \n|  __  |  / _ \\ | | | |  / _ \\  \n| |  | | |  __/ | | | | | (_) | \n|_|  |_|  \\___| |_| |_|  \\___/  \n                                \n                                \n"
 }
 ```
 
-#### Error Response (`400 Bad Request`)
+#### Error (400 Bad Request)
 ```json
 {
   "error": "400 Bad Request: Input contains invalid characters. Only printable ASCII characters (32-126) are allowed."
@@ -134,9 +134,9 @@ The application includes a clean JSON REST API endpoint for third-party integrat
 
 ---
 
-## 🧪 Running Automated Tests
+## Testing
 
-Run the full suite of unit and integration tests (including route handling, newline parsing, bounds checking, and HTML template compilation parsing):
+Run unit tests and template compilation verification:
 
 ```bash
 go test -v ./...
@@ -144,27 +144,27 @@ go test -v ./...
 
 ---
 
-## 📂 Repository Layout
+## Directory Layout
 
 ```
 ascii-art-web-generator/
-├── .github/workflows/   # CI/CD pipelines
-├── banners/             # ASCII font database (.txt files)
-├── templates/           # Presentation views (HTML layouts)
+├── .github/workflows/   # CI workflows
+├── banners/             # ASCII character banner resources (.txt)
+├── templates/           # HTML views
 │   ├── landing.html     # Portfolio landing page
-│   ├── home.html        # Interactive generator card
-│   ├── legal.html       # Dynamic Terms & Privacy policy template
-│   └── error.html       # Styled HTTP error responses
-├── main.go              # Port configurations and route registrations
-├── server.go            # API & HTML HTTP server handlers
-├── server_test.go       # Comprehensive test harness
-├── Dockerfile           # Multi-stage container setup
-├── go.mod               # Module dependencies
-└── README.md            # Modern documentation
+│   ├── home.html        # Interactive generator interface
+│   ├── legal.html       # Dynamic Privacy and Terms
+│   └── error.html       # Customized error pages
+├── main.go              # Server routes and port binding
+├── server.go            # Request handlers and generation logic
+├── server_test.go       # Core logic and template compilation tests
+├── Dockerfile           # Multi-stage build configuration
+├── go.mod               # Go module description
+└── README.md            # Documentation
 ```
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

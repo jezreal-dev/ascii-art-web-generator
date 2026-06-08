@@ -172,30 +172,57 @@
         }
 
         .submit-btn {
+            position: relative;
             background: var(--btn-gradient);
-            border: none;
-            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
             color: var(--text-primary);
             padding: 14px 28px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             box-shadow: 0 4px 12px var(--btn-glow);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
+            overflow: hidden;
         }
 
-        .submit-btn:hover {
-            background: var(--btn-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px var(--btn-glow);
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent
+            );
+            transition: all 0.6s ease;
         }
 
-        .submit-btn:active {
-            transform: translateY(0);
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px var(--btn-glow), 0 0 25px rgba(99, 102, 241, 0.2);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .submit-btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .submit-btn:active:not(:disabled) {
+            transform: translateY(-1px) scale(0.98);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .result-container {
@@ -226,21 +253,28 @@
         }
 
         .copy-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             color: var(--text-secondary);
-            padding: 6px 12px;
+            padding: 8px 16px;
             font-size: 12px;
             font-weight: 600;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
         }
 
         .copy-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.09);
             color: var(--text-primary);
             border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1.5px) scale(1.02);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0) scale(0.98);
         }
 
         pre {

@@ -73,22 +73,31 @@
         }
 
         .back-btn {
-            display: inline-block;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             padding: 12px 28px;
             background: var(--btn-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             text-decoration: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
         }
 
         .back-btn:hover {
             background: var(--btn-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .back-btn:active {
+            transform: translateY(0) scale(0.98);
         }
 
         @keyframes fadeIn {

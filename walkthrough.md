@@ -1,40 +1,35 @@
-# ASCII Art Web — Complete Code Walkthrough & Collaboration Guide
+# ASCII Art Web Generator - Code Walkthrough
 
-This document provides a line-by-line explanation of every function, logic block, and template in the upgraded `ascii-art-web-generator` project. It is designed to help collaborators and evaluators understand how the system operates, the edge cases handled, and the design decisions made.
+This document details the internal design, execution flow, validation boundaries, and testing patterns for the `ascii-art-web-generator` service.
 
 ---
 
-## 1. Project Structure Overview
+## 1. Project Organization
 
 ```mermaid
 graph TD
-    %% Project Structure Graph
-    Root["ascii-art-web (Root Directory)"]
+    Root["ascii-art-web (Root)"]
     
-    %% Main Files
-    Main["main.go <br> (Entry Point)"]
-    Server["server.go <br> (Handlers & Logic)"]
-    Test["server_test.go <br> (Unit & Integration Tests)"]
-    Mod["go.mod <br> (Module Definition)"]
-    Read["README.md <br> (Documentation)"]
+    Main["main.go <br> (Server Init & Router)"]
+    Server["server.go <br> (Page & API Handlers)"]
+    Test["server_test.go <br> (Test Suite)"]
+    Mod["go.mod <br> (Dependencies)"]
+    Read["README.md <br> (Usage Docs)"]
     Walk["walkthrough.md <br> (This Guide)"]
-    Dockerfile["Dockerfile <br> (Container Configuration)"]
+    Dockerfile["Dockerfile <br> (Docker Setup)"]
     
-    %% Directories
-    TemplatesDir["templates/ <br> (HTML Presentation Layer)"]
-    BannersDir["banners/ <br> (ASCII Font Character Database)"]
+    Templates["templates/ <br> (HTML Layouts)"]
+    Banners["banners/ <br> (Font Text Files)"]
     
-    %% Inside Directories
-    LandingTmpl["landing.html <br> (Developer Bio & Entry)"]
+    LandingTmpl["landing.html <br> (Portfolio Landing Page)"]
     HomeTmpl["home.html <br> (Interactive Generator Tool)"]
-    LegalTmpl["legal.html <br> (Privacy & Terms View)"]
-    ErrorTmpl["error.html <br> (Styled Error Page)"]
+    LegalTmpl["legal.html <br> (Terms & Privacy)"]
+    ErrorTmpl["error.html <br> (Styled Error Views)"]
     
-    StandardB["standard.txt <br> (Standard Font)"]
+    StandardB["standard.txt <br> (Default Font)"]
     ShadowB["shadow.txt <br> (Shadow Font)"]
     ThinkertoyB["thinkertoy.txt <br> (Thinkertoy Font)"]
 
-    %% Connections
     Root --> Main
     Root --> Server
     Root --> Test
@@ -42,82 +37,64 @@ graph TD
     Root --> Read
     Root --> Walk
     Root --> Dockerfile
-    Root --> TemplatesDir
-    Root --> BannersDir
+    Root --> Templates
+    Root --> Banners
     
-    TemplatesDir --> LandingTmpl
-    TemplatesDir --> HomeTmpl
-    TemplatesDir --> LegalTmpl
-    TemplatesDir --> ErrorTmpl
+    Templates --> LandingTmpl
+    Templates --> HomeTmpl
+    Templates --> LegalTmpl
+    Templates --> ErrorTmpl
     
-    BannersDir --> StandardB
-    BannersDir --> ShadowB
-    BannersDir --> ThinkertoyB
-
-    %% Styles
-    classDef dir fill:#1e293b,stroke:#4f46e5,stroke-width:2px,color:#f8fafc;
-    classDef file fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#94a3b8;
-    classDef root fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#f8fafc;
-    
-    class Root root;
-    class TemplatesDir,BannersDir dir;
-    class Main,Server,Test,Mod,Read,Walk,Dockerfile,LandingTmpl,HomeTmpl,LegalTmpl,ErrorTmpl,StandardB,ShadowB,ThinkertoyB file;
+    Banners --> StandardB
+    Banners --> ShadowB
+    Banners --> ThinkertoyB
 ```
 
-* **`main.go`**: Starts up the application, configures the routes, binds the TCP port dynamically from the environment.
-* **`server.go`**: Contains the state structs, handler functions for pages (landing, generator, privacy, terms), AJAX JSON REST API endpoint, template loaders, and the core rendering generator.
-* **`templates/`**: Hosts our frontend layouts. `landing.html` introduces the project; `home.html` serves as the form and viewer; `legal.html` displays policies; and `error.html` is executed on HTTP errors.
-* **`banners/`**: Houses the text-based ASCII font characters database.
+* **`main.go`**: Bootstraps the server, configures HTTP routes, and binds the listener port dynamically.
+* **`server.go`**: Implements page routes, the REST API handler, template loading, and the ASCII generator logic.
+* **`templates/`**: Presentation layer containing dark-theme layouts with JS AJAX integration.
+* **`banners/`**: Source text files representing monospaced font mappings.
 
 ---
 
-## 2. How the Whole System Works
+## 2. Request Lifecycle
 
-This sequence diagram displays the step-by-step lifecycles of AJAX and REST API requests, highlighting validation gates and response structures.
+The system handles both standard HTML page loads and asynchronous JSON generations.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as Web Browser / API client
-    participant Router as Go Router (DefaultServeMux)
-    participant Handler as Handlers (apiAsciiArtHandler / generatorHandler)
-    participant FS as File System (banners/*.txt / templates/*.html)
-    participant Template as Go html/template Engine
+    actor User as Client
+    participant Router as Go HTTP Server
+    participant Handler as Handlers (API / Tool)
+    participant Disk as Disk (Templates / Banners)
+    participant TmplEngine as Go html/template
 
     rect rgb(30, 41, 59)
-        note right of Client: User opens tool (GET /generator)
-        Client->>Router: GET /generator
-        Router->>Handler: generatorHandler(w, r)
-        Handler->>FS: Load templates/home.html
-        FS-->>Handler: home.html bytes
-        Handler->>Template: Parse & Execute (PageData{Banner: "standard"})
-        Template-->>Handler: Rendered HTML page
-        Handler-->>Client: 200 OK HTML Page
+        note right of User: Tool Page Initialization (GET /generator)
+        User->>Router: GET /generator
+        Router->>Handler: generatorHandler
+        Handler->>Disk: Load templates/home.html
+        Disk-->>Handler: File Bytes
+        Handler->>TmplEngine: Parse & Inject Default State
+        TmplEngine-->>Handler: Rendered HTML
+        Handler-->>User: 200 OK (Interactive Form)
     end
 
     rect rgb(15, 23, 42)
-        note right of Client: JS Intercepts Form & Sends JSON (POST /api/ascii-art)
-        Client->>Router: POST /api/ascii-art [JSON payload: text, banner]
-        Router->>Handler: apiAsciiArtHandler(w, r)
-        Handler->>Handler: Decode JSON & Validate fields (text != "", allowed banner)
-        alt invalid input
-            Handler-->>Client: 400 Bad Request [JSON error description]
-        else valid parameters
-            Handler->>FS: Read banner file (banners/<banner>.txt)
-            alt banner file missing or short
-                FS-->>Handler: error (missing or corrupted file)
-                Handler-->>Client: 404 Not Found [JSON error description]
-            else banner loaded successfully
-                FS-->>Handler: banner bytes
-                Handler->>Handler: AsciiArt(text, banner)
-                loop For each character
-                    Handler->>Handler: Validate ASCII code [32, 126]
-                end
-                alt contains invalid characters (e.g. emoji)
-                    Handler-->>Client: 400 Bad Request [JSON error description]
-                else all valid
-                    Handler-->>Client: 200 OK [JSON result payload: ascii art]
-                end
+        note right of User: Asynchronous Art Generation (POST /api/ascii-art)
+        User->>Router: POST /api/ascii-art (JSON payload)
+        Router->>Handler: apiAsciiArtHandler
+        Handler->>Handler: Decode Request & Validate Parameters
+        alt Invalid Payload / Unicode (Emojis)
+            Handler-->>User: 400 Bad Request (JSON error)
+        else Valid Inputs
+            Handler->>Disk: Read banner file
+            alt Missing / Corrupted File
+                Handler-->>User: 404 Not Found (JSON error)
+            else Successful Read
+                Handler->>Handler: Process character transformations
+                Handler-->>User: 200 OK (JSON response with art output)
             end
         end
     end
@@ -125,42 +102,22 @@ sequenceDiagram
 
 ---
 
-## 3. Comparison: Previous Code vs. Compliant Enhancements
+## 3. Vulnerability Mitigations & Edge Case Handlers
 
-The following details show what the previous code failed to handle under audit conditions, and how we resolved it:
-
-| Audit Challenge | Old Code Behavior | Failure Reason | New Code Behavior (The Fix) |
-| :--- | :--- | :--- | :--- |
-| **Multi-line Text Inputs** | Handled literal string `\\n` only. | If users pressed "Enter" in the browser (sending actual `\n` or `\r\n`), `char - ' '` became `10 - 32 = -22`, throwing a **negative index slice panic** and crashing the handler. | Replaces CRLF (`\r\n`) and literal `\\n` with standard `\n`, then splits inputs by `\n` before iterating. |
-| **Non-ASCII Characters (e.g., 😊)** | Passed unchecked to index calculation. | Emojis and other non-ASCII character runes threw **index out-of-bounds panics** during lookups. | Inspects every character in the input loop. If any char is outside `[32, 126]` (excluding normalized newlines), it returns a clear error. |
-| **Empty Form Fields** | Handled with raw text error responses. | Plain text responses look unpolished and do not display well to users. | Catches empty inputs and responds with a beautiful custom HTML 400 page or clean JSON error payload. |
-| **Asynchronous Generation** | Reloaded full page on every submit. | Full page reload disrupts page interactions, breaks states, and feels sluggish. | Upgraded frontend to perform AJAX Fetch operations on `/api/ascii-art` and update the view dynamically. |
-| **Missing Banner Files** | Triggered basic 404 page. | No distinction made between missing assets vs. corrupted local data. | Performs file size and path checks, returning status-specific templates for 404 and 500 issues. |
-| **Form Resetting** | Inputs vanished on submission. | Page reloaded with empty text boxes and reset selected radios, degrading the user experience. | Struct-bound `PageData` holds form states and re-injects values back into the frontend elements. |
+| Scenario | Risk | Mitigation |
+| :--- | :--- | :--- |
+| **Newlines in Input** | Array index out-of-bounds crash (`char - ' '` index underflow). | Replaces CRLF (`\r\n`) and literal sequences with `\n`, then splits inputs into strings before character lookup. |
+| **Unicode / Non-ASCII** | Out-of-bounds slice indexing when reading character ranges. | Enforces printable ASCII bounds `[32, 126]` for all character lookups. Triggers `400 Bad Request` if emoji or other invalid symbols are supplied. |
+| **Empty Requests** | Empty outputs causing server panics. | Short-circuits empty submissions to return `200 OK` empty string, or throws `400 Bad Request` for invalid form submissions. |
+| **Path Traversal** | Reading arbitary files via the `banner` parameter. | Limits chosen banner names strictly to allowed style presets (`standard`, `shadow`, `thinkertoy`). |
+| **Asynchronous UI States** | Poor UX on form reload. | Replaced standard form redirection with a JavaScript `fetch` handler, showing a dynamic spinner and rendering changes in-place. |
 
 ---
 
-## 4. Line-by-Line Code Breakdown
+## 4. Code Breakdown
 
-### A. main.go — The Bootstrapper
-`main.go` registers our web routes and kicks off the TCP listener.
-
-```go
-package main
-
-import (
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-)
-```
-* **Line 1**: Declares `package main`, telling Go this compiles to an executable program.
-* **Line 3-8**: Imports:
-  * `"fmt"`: Writes messages to standard console output.
-  * `"log"`: Handles server startup errors.
-  * `"net/http"`: Provides the HTTP router and TCP server.
-  * `"os"`: Reads environment variables for dynamic port binding.
+### main.go (Boilerplate & Routing)
+Registers handlers and sets up dynamic port binding for target environments (like Render).
 
 ```go
 func main() {
@@ -177,28 +134,19 @@ func main() {
 	}
 
 	fmt.Printf("Server running at http://localhost:%s\n", port)
-
 	err := http.ListenAndServe(":"+ port, nil)
 	if err != nil {
 		log.Fatal("Error starting server:", err)
 	}
 }
 ```
-* **Line 10**: Declares the application entrypoint `main()`.
-* **Line 11-16**: Registers HTTP routes:
-  * `/` maps to `homeHandler` (renders the landing page).
-  * `/generator` maps to `generatorHandler` (renders the ASCII tool page).
-  * `/ascii-art` maps to `asciiArtHandler` (handles server-side form submission).
-  * `/api/ascii-art` maps to `apiAsciiArtHandler` (handles client-side JSON API requests).
-  * `/privacy` and `/terms` map to legal pages.
-* **Line 18-22**: Reads TCP Port configuration from the environment (defaulting to 8080).
-* **Line 27**: Starts the server listening on the dynamic port.
 
 ---
 
-### B. server.go — Handlers and Logic
-`server.go` contains the handlers, API structures, custom page renderer, and string mapping processor.
+### server.go (Application Logic)
 
+#### API Types
+JSON bindings for request and response payloads.
 ```go
 type APIRequest struct {
 	Text   string `json:"text"`
@@ -210,10 +158,9 @@ type APIResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 ```
-* Defines JSON schemas for asynchronous API communication:
-  * `APIRequest` binds input text and banner style.
-  * `APIResponse` holds the generated art (`Result`) or an error message.
 
+#### apiAsciiArtHandler
+Verifies request rules, handles JSON decoding, and returns the converted string or diagnostic errors.
 ```go
 func apiAsciiArtHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -260,24 +207,73 @@ func apiAsciiArtHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(APIResponse{Result: result})
 }
 ```
-* **JSON API Endpoint Handler**:
-  * Enforces `POST` requests and sets Content-Type header to `application/json`.
-  * Decodes the JSON body.
-  * Validates inputs (non-empty text, valid banner names, printable ASCII range).
-  * Returns formatted JSON error details on validation failure with standard HTTP codes (400, 404, 405).
-  * Encodes the generated monospaced string into the JSON response on success (200 OK).
+
+#### Core Generation Engine (`AsciiArt`)
+Reads font mappings, validates characters, and returns the formatted monospaced string.
+```go
+func AsciiArt(input string, banners string) (string, error) {
+	filePath := "banners/" + banners + ".txt"
+	inputFile, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", errors.New("banner file not found")
+	}
+
+	content := strings.ReplaceAll(string(inputFile), "\r\n", "\n")
+	inputFileLines := strings.Split(content, "\n")
+	if len(inputFileLines) < 855 {
+		return "", errors.New("corrupted banner file")
+	}
+
+	input = strings.ReplaceAll(input, "\r\n", "\n")
+	input = strings.ReplaceAll(input, "\\n", "\n")
+
+	if input == "" {
+		return "", nil
+	}
+
+	onlyNewLine := true
+	for _, char := range input {
+		if char != '\n' {
+			onlyNewLine = false
+			break
+		}
+	}
+	if onlyNewLine {
+		return input, nil
+	}
+
+	words := strings.Split(input, "\n")
+	result := ""
+
+	for _, word := range words {
+		if word == "" {
+			result += "\n"
+			continue
+		}
+
+		for i := 0; i < 8; i++ {
+			for _, char := range word {
+				if char < 32 || char > 126 {
+					return "", errors.New("Invalid character in input")
+				}
+				result += inputFileLines[i+(int(char-' ')*9)+1]
+			}
+			result += "\n"
+		}
+	}
+	return result, nil
+}
+```
 
 ---
 
-## 5. Frontend AJAX Template Logic
+## 5. Frontend AJAX Integration (templates/home.html)
 
-### templates/home.html — Asynchronous Script
-`templates/home.html` includes JavaScript that intercepts form submission, runs AJAX requests, handles loading states, and updates DOM overlays.
+Intercepts form submissions, issues requests to the JSON API, handles button loading animations, and dynamically updates the DOM.
 
 ```javascript
-// Intercept Form Submission and fetch the API
 document.getElementById("generator-form").addEventListener("submit", function(event) {
-    event.preventDefault(); // Prevent standard page reload
+    event.preventDefault(); // Intercept page reload
 
     const textInput = document.getElementById("text-input").value;
     const bannerInput = document.querySelector('input[name="banner"]:checked').value;
@@ -287,33 +283,20 @@ document.getElementById("generator-form").addEventListener("submit", function(ev
     const submitBtn = document.querySelector(".submit-btn");
     const submitBtnText = submitBtn.querySelector("span");
 
-    // Show loading state
     submitBtn.disabled = true;
     submitBtnText.textContent = "Generating...";
-
-    // Reset UI states
     errorBanner.classList.remove("visible");
     
     fetch("/api/ascii-art", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            text: textInput,
-            banner: bannerInput
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textInput, banner: bannerInput })
     })
-    .then(response => {
-        return response.json().then(data => {
-            if (!response.ok) {
-                throw new Error(data.error || `HTTP ${response.status} Error`);
-            }
-            return data;
-        });
-    })
+    .then(response => response.json().then(data => {
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status} Error`);
+        return data;
+    }))
     .then(data => {
-        // Render ASCII art result dynamically
         resultWrapper.innerHTML = `
             <div class="result-container">
                 <div class="result-header">
@@ -325,32 +308,23 @@ document.getElementById("generator-form").addEventListener("submit", function(ev
         `;
     })
     .catch(err => {
-        // Show error banner and clear result wrapper
         errorMessage.textContent = err.message;
         errorBanner.classList.add("visible");
         resultWrapper.innerHTML = "";
     })
     .finally(() => {
-        // Restore button state
         submitBtn.disabled = false;
         submitBtnText.textContent = "Generate Art";
     });
 });
 ```
-* **AJAX Integration Flow**:
-  1. Hooks into the submit event of `#generator-form` and stops the default request lifecycle.
-  2. Disables the submit button and switches the text to "Generating..." to indicate progress.
-  3. Fires a `POST` request to `/api/ascii-art` with a JSON payload of the user's inputs.
-  4. If successful, injects a newly populated `.result-container` containing the monospaced ASCII art block into the `#result-wrapper` DOM.
-  5. On error, shows the `#error-banner` containing the validation error reason, and clears any stale results.
-  6. Restores the submit button back to normal.
 
 ---
 
-## 6. server_test.go — Testing Suite
+## 6. Testing
 
-The testing suite contains unit and integration tests including:
-- **`TestTemplatesParse`**: Ensures all HTML template layouts compile without any syntax errors:
+`server_test.go` exercises the server configuration. In addition to bounds checks and routing responses, it includes:
+- **`TestTemplatesParse`**: Loops through template resources and parses them to assert syntactic validity:
   ```go
   func TestTemplatesParse(t *testing.T) {
       templates := []string{
@@ -367,5 +341,4 @@ The testing suite contains unit and integration tests including:
       }
   }
   ```
-- **`TestAsciiArtHandlerInvalidCharacter`**: Validates that bad requests containing non-printable symbols trigger HTTP 400 errors.
-- **`TestAsciiArtOnlyNewlines`**: Assures that newline-only inputs are handled gracefully without panicking.
+- **`TestAsciiArtHandlerInvalidCharacter`**: Assures range violations return HTTP `400 Bad Request`.
