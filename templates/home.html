@@ -320,6 +320,31 @@
                 padding: 20px 12px;
             }
         }
+                /* Error Banner */
+        .error-banner {
+            display: none; /* hidden by default */
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: #fca5a5;
+            font-size: 14px;
+            line-height: 1.5;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.1);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .error-banner.visible {
+            display: flex;
+        }
+
+        .error-banner svg {
+            flex-shrink: 0;
+            color: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -330,7 +355,7 @@
 
     <main>
         <div class="card">
-            <form action="/ascii-art" method="POST">
+            <form id="generator-form" action="/ascii-art" method="POST">
                 <div class="form-group">
                     <label for="text-input">Enter text:</label>
                     <textarea id="text-input" name="text" placeholder="Type something to convert... (Press Enter for newlines)" required>{{ .Text }}</textarea>
@@ -375,15 +400,24 @@
             </div>
         </div>
 
-        {{ if .AsciiArt }}
-        <div class="result-container">
-            <div class="result-header">
-                <span>Output Art</span>
-                <button class="copy-btn" id="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
-            </div>
-            <pre id="ascii-output">{{ .AsciiArt }}</pre>
+        <!-- Error Banner Container -->
+        <div id="error-banner" class="error-banner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="error-message"></span>
         </div>
-        {{ end }}
+
+        <!-- Result Wrapper Container -->
+        <div id="result-wrapper">
+            {{ if .AsciiArt }}
+            <div class="result-container">
+                <div class="result-header">
+                    <span>Output Art</span>
+                    <button class="copy-btn" id="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+                </div>
+                <pre id="ascii-output">{{ .AsciiArt }}</pre>
+            </div>
+            {{ end }}
+        </div>
     </main>
 
     <script>
@@ -406,6 +440,77 @@
                 console.error("Failed to copy text: ", err);
             });
         }
+                // HTML escaping utility to keep result display safe
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Intercept Form Submission and fetch the API
+        document.getElementById("generator-form").addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevent standard page reload
+
+            const textInput = document.getElementById("text-input").value;
+            const bannerInput = document.querySelector('input[name="banner"]:checked').value;
+            const errorBanner = document.getElementById("error-banner");
+            const errorMessage = document.getElementById("error-message");
+            const resultWrapper = document.getElementById("result-wrapper");
+            const submitBtn = document.querySelector(".submit-btn");
+            const submitBtnText = submitBtn.querySelector("span");
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtnText.textContent = "Generating...";
+
+            // Reset UI states
+            errorBanner.classList.remove("visible");
+            
+            fetch("/api/ascii-art", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    text: textInput,
+                    banner: bannerInput
+                })
+            })
+            .then(response => {
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        throw new Error(data.error || `HTTP ${response.status} Error`);
+                    }
+                    return data;
+                });
+            })
+            .then(data => {
+                // Render ASCII art result dynamically
+                resultWrapper.innerHTML = `
+                    <div class="result-container">
+                        <div class="result-header">
+                            <span>Output Art</span>
+                            <button class="copy-btn" id="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+                        </div>
+                        <pre id="ascii-output">${escapeHtml(data.result)}</pre>
+                    </div>
+                `;
+            })
+            .catch(err => {
+                // Show error banner and clear result wrapper
+                errorMessage.textContent = err.message;
+                errorBanner.classList.add("visible");
+                resultWrapper.innerHTML = "";
+            })
+            .finally(() => {
+                // Restore button state
+                submitBtn.disabled = false;
+                submitBtnText.textContent = "Generate Art";
+            });
+        });
     </script>
 </body>
 </html>

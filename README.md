@@ -1,99 +1,170 @@
-# ASCII Art Web
+# 🎨 ASCII Art Web Generator
 
-## Description
+[![Go Version](https://img.shields.io/github/go-mod/go-version/jezreal-dev/ascii-art-web-generator?color=00ADD8&style=for-the-badge&logo=go)](https://golang.org/)
+[![Docker Support](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![GitHub Actions CI](https://img.shields.io/github/actions/workflow/status/jezreal-dev/ascii-art-web-generator/go-ci.yml?branch=main&style=for-the-badge&logo=github-actions&label=CI)](https://github.com/jezreal-dev/ascii-art-web-generator/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-ASCII Art Web is a web-based GUI version of the ascii-art project. It runs an HTTP server that allows users to convert text into ASCII art through a browser interface. Users can type any text, choose from three banner styles (standard, shadow, thinkertoy), and view the rendered ASCII art on the same page.
+An interactive, production-grade web application and JSON REST API that converts text into beautiful, monospaced ASCII banner art. Features a premium glassmorphic dark interface, real-time AJAX generations, input validation, and containerized deployment workflow.
 
-## Authors
+---
 
-- Jezreal Oseiwe Momoh (Username - jmomoh) & Mansur Adewale Adeyemi(Username - madeyemi)
+## 📌 Architecture Layout
 
-## Usage
+```mermaid
+graph TD
+    Client[Web Browser / API Client] -->|HTTP Requests| Router[Go DefaultServeMux Router]
+    
+    subgraph Handlers [HTTP Request Handlers]
+        Router -->|GET /| Home[homeHandler]
+        Router -->|GET /generator| Gen[generatorHandler]
+        Router -->|POST /ascii-art| Form[asciiArtHandler]
+        Router -->|POST /api/ascii-art| JSON[apiAsciiArtHandler]
+        Router -->|GET /privacy & /terms| Legal[legalHandler]
+    end
 
-### How to run
+    subgraph Core [Core Processing Engine]
+        Form -->|Process Text| Art[AsciiArt Engine]
+        JSON -->|Process JSON| Art
+        Art -->|Read Font Data| Banners[(banners/*.txt)]
+    end
 
-1. Clone or navigate to the project directory.
-2. Make sure you have Go installed (version 1.18+).
-3. Run the server:
+    subgraph Presentation [Templates & Views]
+        Home -->|Render Landing| LandingTmpl[landing.html]
+        Gen -->|Render Interface| HomeTmpl[home.html]
+        Legal -->|Render Policy| LegalTmpl[legal.html]
+        Router -->|Render Errors| ErrorTmpl[error.html]
+    end
+```
+
+---
+
+## ✨ Features
+
+- ⚡ **Asynchronous Generation**: Text-to-art conversion happens instantly via JavaScript AJAX `fetch` calls, without full page reloads.
+- 🎨 **Harmonious Glassmorphism UI**: High-end styling featuring responsive grids, modern typography, stateful font selector cards, and custom micro-interactions.
+- 📋 **Copy to Clipboard**: Quick copy button with transition animations and visual feedback alerts.
+- 🛡️ **Edge-case Safety**: Validates input runes against standard printable ASCII bounds `[32, 126]`, preventing buffer overruns or negative-indexing crashes.
+- 🐳 **Docker Containerized**: Multi-stage Docker deployment setup for minimal production container footprint.
+- 🤖 **CI/CD Configured**: Automated tests and compilation runs on every GitHub branch push.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Backend Language:** Go (Golang)
+- **Frontend Presentation:** HTML5, Vanilla CSS3 (Glassmorphism), Vanilla JavaScript ES6
+- **CI/CD & Deployment:** GitHub Actions, Docker, Render Cloud
+- **Fonts Supported:** Standard, Shadow, Thinkertoy
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Go (1.18+ recommended)
+- Docker (optional, for containerized run)
+
+### Running Locally (Go Toolchain)
+
+1. Clone the repository and navigate to the root directory:
+   ```bash
+   git clone https://github.com/jezreal-dev/ascii-art-web-generator.git
+   cd ascii-art-web-generator
+   ```
+
+2. Start the local server:
+   ```bash
+   go run .
+   ```
+
+3. Open your browser and navigate to:
+   - **Landing Page**: `http://localhost:8080/`
+   - **Generator Tool**: `http://localhost:8080/generator`
+
+---
+
+### Running with Docker
+
+1. Build the lightweight production Docker image:
+   ```bash
+   docker build -t ascii-art-generator .
+   ```
+
+2. Run the container and map the port:
+   ```bash
+   docker run -p 8080:8080 ascii-art-generator
+   ```
+
+3. Access the application at `http://localhost:8080/generator`.
+
+---
+
+## 📡 REST API Specifications
+
+The application includes a clean JSON REST API endpoint for third-party integrations or headless generations.
+
+### Generate ASCII Art
+
+- **Endpoint:** `POST /api/ascii-art`
+- **Content-Type:** `application/json`
+
+#### Request Payload
+```json
+{
+  "text": "Hello World",
+  "banner": "standard"
+}
+```
+
+#### Successful Response (`200 OK`)
+```json
+{
+  "result": " _    _          _   _          \n| |  | |        | | | |         \n| |__| |   ___  | | | |   ___   \n|  __  |  / _ \\ | | | |  / _ \\  \n| |  | | |  __/ | | | | | (_) | \n|_|  |_|  \\___| |_| |_|  \\___/  \n                                \n                                \n"
+}
+```
+
+#### Error Response (`400 Bad Request`)
+```json
+{
+  "error": "400 Bad Request: Input contains invalid characters. Only printable ASCII characters (32-126) are allowed."
+}
+```
+
+---
+
+## 🧪 Running Automated Tests
+
+Run the full suite of unit and integration tests (including route handling, newline parsing, bounds checking, and HTML template compilation parsing):
 
 ```bash
-go run .
+go test -v ./...
 ```
 
-4. Open your browser and visit:
+---
+
+## 📂 Repository Layout
 
 ```
-http://localhost:8080
+ascii-art-web-generator/
+├── .github/workflows/   # CI/CD pipelines
+├── banners/             # ASCII font database (.txt files)
+├── templates/           # Presentation views (HTML layouts)
+│   ├── landing.html     # Portfolio landing page
+│   ├── home.html        # Interactive generator card
+│   ├── legal.html       # Dynamic Terms & Privacy policy template
+│   └── error.html       # Styled HTTP error responses
+├── main.go              # Port configurations and route registrations
+├── server.go            # API & HTML HTTP server handlers
+├── server_test.go       # Comprehensive test harness
+├── Dockerfile           # Multi-stage container setup
+├── go.mod               # Module dependencies
+└── README.md            # Modern documentation
 ```
 
-5. Type your text, select a banner, and click **Generate**.
+---
 
-### Example
+## 📄 License
 
-Input text: `Hello`
-Banner: `standard`
-
-Expected output:
-
-```
- _    _          _   _          
-| |  | |        | | | |         
-| |__| |   ___  | | | |   ___   
-|  __  |  / _ \ | | | |  / _ \  
-| |  | | |  __/ | | | | | (_) | 
-|_|  |_|  \___| |_| |_|  \___/  
-                                
-                                
-```
-
-### Project Structure
-
-```
-ascii-art-web/
-├── main.go              # Entry point — registers routes and starts the server
-├── server.go            # HTTP handlers and ASCII art generation logic
-├── server_test.go       # Unit tests for the AsciiArt function
-├── go.mod               # Go module definition
-├── README.md            # This file
-├── templates/
-│   └── home.html        # HTML template for the main page
-└── banners/
-    ├── standard.txt     # Standard banner font
-    ├── shadow.txt       # Shadow banner font
-    └── thinkertoy.txt   # Thinkertoy banner font
-```
-
-## Implementation Details: Algorithm
-
-The ASCII art generation works as follows:
-
-1. **Banner file loading** — Each banner (`standard`, `shadow`, `thinkertoy`) is stored as a `.txt` file in the `banners/` directory. The file contains the ASCII art representation of every printable character (from space onward), each rendered across 8 lines, with a blank separator line between characters.
-
-2. **Input processing** — The user's input is split on the literal `\n` sequence to support multi-line output.
-
-3. **Character lookup** — For each character in the input, its position in the banner file is calculated using:
-   ```
-   position = (ASCII value of character - ASCII value of space) × 9 + 1
-   ```
-   Each character occupies 9 lines (8 lines of art + 1 blank separator). The `+1` skips the leading blank line.
-
-4. **Line-by-line rendering** — The output is built by iterating 8 times per word (once per art line), collecting the corresponding banner line for each character, and joining them with newlines.
-
-5. **Template rendering** — The result is passed to Go's `html/template` engine and rendered inside a `<pre>` tag in `templates/home.html` to preserve spacing and formatting.
-
-### HTTP Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/` | Serves the main page with the input form |
-| POST | `/ascii-art` | Receives form data, generates ASCII art, returns result |
-
-### HTTP Status Codes
-
-| Code | When |
-|------|------|
-| 200 OK | Successful request |
-| 400 Bad Request | Missing text or banner selection |
-| 404 Not Found | Invalid route or missing template |
-| 405 Method Not Allowed | Wrong HTTP method used |
-| 500 Internal Server Error | ASCII art generation failed |
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

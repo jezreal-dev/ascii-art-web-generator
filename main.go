@@ -11,6 +11,7 @@ func main() {
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/generator", generatorHandler)
 	http.HandleFunc("/ascii-art", asciiArtHandler)
+	http.HandleFunc("/api/ascii-art", apiAsciiArtHandler)
 	http.HandleFunc("/privacy", privacyHandler)
 	http.HandleFunc("/terms", termsHandler)
 

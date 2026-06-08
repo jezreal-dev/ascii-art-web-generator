@@ -1,9 +1,10 @@
 package main
 
 import (
-	"strings"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -214,5 +215,20 @@ func TestAsciiArtHandlerInvalidCharacter(t *testing.T) {
 	asciiArtHandler(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 Bad Request, got %d", rr.Code)
+	}
+}
+
+func TestTemplatesParse(t *testing.T) {
+	templates := []string{
+		"templates/home.html",
+		"templates/landing.html",
+		"templates/legal.html",
+		"templates/error.html",
+	}
+	for _, tmplPath := range templates {
+		_, err := template.ParseFiles(tmplPath)
+		if err != nil {
+			t.Errorf("Failed to parse template file %s: %v", tmplPath, err)
+		}
 	}
 }

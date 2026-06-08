@@ -1,11 +1,12 @@
 package main
 
 import (
+	"os"
+	"strings"
 	"errors"
 	"html/template"
 	"net/http"
-	"os"
-	"strings"
+	"encoding/json"
 )
 
 // PageData holds the context variables passed to the HTML templates.
@@ -14,6 +15,18 @@ type PageData struct {
 	Banner   string
 	AsciiArt string
 }
+
+// APIRequest defines the JSON payload received from the client.
+type APIRequest struct {
+	Text   string `json:"text"`
+	Banner string `json:"banner"`
+}
+// APIResponse defines the JSON payload sent back to the client.
+type APIResponse struct {
+	Result string `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
 
 // homeHandler serves the application landing page.
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -239,4 +252,49 @@ func termsHandler(w http.ResponseWriter, r *http.Request) {
 		"Title": "Terms of Service",
 		"Type":  "terms",
 	})
+}
+
+func apiAsciiArtHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(APIResponse{Error: "405 Method Not Allowed: Use POST."})
+		return
+	}
+
+	var req APIRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{Error: "400 Bad Request: Invalid JSON payload."})
+		return
+	}
+
+	if req.Text == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{Error: "400 Bad Request: Text field cannot be empty."})
+		return
+	}
+
+	if req.Banner != "standard" && req.Banner != "shadow" && req.Banner != "thinkertoy" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{Error: "400 Bad Request: Invalid banner style. Allowed values are 'standard', 'shadow', 'thinkertoy'."})
+		return
+	}
+
+	result, err := AsciiArt(req.Text, req.Banner)
+	if err != nil {
+		if err.Error() == "Invalid character in input" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(APIResponse{Error: "400 Bad Request: Input contains invalid characters. Only printable ASCII characters (32-126) are allowed."})
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(APIResponse{Error: "404 Not Found: The selected banner file is missing or corrupted."})
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(APIResponse{Result: result})
 }
